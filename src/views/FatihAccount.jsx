@@ -97,8 +97,15 @@ export default function FatihAccount({ data, reload }) {
       const salaryTryTotal = (salaries || []).reduce((s, sal) => s + safeNumber(sal.amount_try), 0)
 
       // Açılış bakiyesi
-      const openingBalanceChf = safeNumber(settings.opening_balance_chf)
-      const openingBalanceTry = openingBalanceChf * 54
+      // Settings ekranı `initial_balance_chf`/`initial_balance_try` alanlarına
+      // yazıyor; eski `opening_balance_chf` adı eşleşmediği için bakiye burada
+      // 0 görünüyordu. Önce yeni alanı oku, yoksa eski isime düş.
+      const openingBalanceChf = safeNumber(
+        settings.initial_balance_chf ?? settings.opening_balance_chf
+      )
+      const openingBalanceTry = safeNumber(
+        settings.initial_balance_try ?? openingBalanceChf * 54
+      )
 
       // Toplam bakiye - SADECE CHF
       const totalChf = openingBalanceChf + salaryChfTotal
