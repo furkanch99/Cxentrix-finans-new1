@@ -647,8 +647,18 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
   }, [fatihData, year, getSafeRate])
 
   const activeMonths = monthlyHakedis.filter(m => m.hakedisChf > 0 || m.transferChf > 0)
-  const totalHakedisChf = activeMonths.reduce((s, m) => s + m.hakedisChf, 0)
-  const totalHakedisTry = activeMonths.reduce((s, m) => s + m.hakedisTry, 0)
+  const monthlyHakedisChf = activeMonths.reduce((s, m) => s + m.hakedisChf, 0)
+  const monthlyHakedisTry = activeMonths.reduce((s, m) => s + m.hakedisTry, 0)
+
+  // Başlangıç bakiyesi (Fatih'in açılışta sahip olduğu alacak),
+  // sadece başlangıç tarihinin yılı seçildiğinde toplamlara eklenir.
+  const startYear = fatihData.startDate ? new Date(fatihData.startDate).getFullYear() : null
+  const openingChfForYear = startYear === year ? safeNumber(fatihData.openingBalanceChf) : 0
+  const openingTryForYear = startYear === year ? safeNumber(fatihData.openingBalanceTry) : 0
+  const showOpeningRow = openingChfForYear !== 0 || openingTryForYear !== 0
+
+  const totalHakedisChf = monthlyHakedisChf + openingChfForYear
+  const totalHakedisTry = monthlyHakedisTry + openingTryForYear
   const totalTransferTry = activeMonths.reduce((s, m) => s + m.transferTry, 0)
   const totalTransferChf = activeMonths.reduce((s, m) => s + m.transferChf, 0)
   const totalKalanChf = totalHakedisChf - totalTransferChf
@@ -715,7 +725,23 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
             <div style={{ textAlign: 'right' }}>Kalan CHF</div>
           </div>
 
-          {activeMonths.length === 0 ? (
+          {showOpeningRow && (
+            <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 1fr 1fr 1fr 1fr 1fr 1fr', gap: 8, padding: '12px 12px', background: 'var(--accent-soft)', border: '1px dashed var(--accent)', borderRadius: 6, alignItems: 'center', marginBottom: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>
+                Açılış
+                <div style={{ fontSize: 9, color: 'var(--ink-muted)', fontWeight: 400 }}>{year}</div>
+              </div>
+              <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: 'var(--green)', textAlign: 'right' }}>{fmtCHF(openingChfForYear)}</div>
+              <div className="mono" style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
+              <div className="mono" style={{ fontSize: 12, color: 'var(--ink-soft)', textAlign: 'right' }}>{fmtTL(openingTryForYear)}</div>
+              <div className="mono" style={{ fontSize: 12, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
+              <div className="mono" style={{ fontSize: 12, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
+              <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: 'var(--green)', textAlign: 'right' }}>{fmtTL(openingTryForYear)}</div>
+              <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', textAlign: 'right' }}>{fmtCHF(openingChfForYear)}</div>
+            </div>
+          )}
+
+          {activeMonths.length === 0 && !showOpeningRow ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-muted)', fontSize: 13 }}>
               {year} yılı için kayıtlı hakediş bulunamadı.
             </div>
@@ -737,7 +763,7 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
             ))
           )}
 
-          {activeMonths.length > 0 && (
+          {(activeMonths.length > 0 || showOpeningRow) && (
             <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 1fr 1fr 1fr 1fr 1fr 1fr', gap: 8, padding: '14px 12px', background: 'var(--accent-soft)', border: '2px solid var(--accent)', borderRadius: 8, alignItems: 'center', marginTop: 8 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>TOPLAM</div>
               <div className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)', textAlign: 'right' }}>{fmtCHF(totalHakedisChf)}</div>
