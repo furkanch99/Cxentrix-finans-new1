@@ -590,9 +590,10 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
 
   const availableYears = useMemo(() => {
     const ys = new Set()
-    fatihData.salaryTxs.forEach(t => ys.add(new Date(t.date).getFullYear()))
-    fatihData.frenchTxs.forEach(t => ys.add(new Date(t.date).getFullYear()))
-    fatihData.transferTxs.forEach(t => ys.add(new Date(t.date).getFullYear()))
+    // Maaş kayıtlarında tarih `date` yerine `year` alanında.
+    fatihData.salaryTxs.forEach(s => { if (s.year != null) ys.add(s.year) })
+    fatihData.frenchTxs.forEach(t => { const y = new Date(t.date).getFullYear(); if (!isNaN(y)) ys.add(y) })
+    fatihData.transferTxs.forEach(t => { const y = new Date(t.date).getFullYear(); if (!isNaN(y)) ys.add(y) })
     ys.add(new Date().getFullYear())
     return Array.from(ys).sort((a,b) => b-a)
   }, [fatihData])
@@ -603,13 +604,17 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
       transferTry: 0, transferChf: 0, rate: 36
     }))
 
-    fatihData.salaryTxs.forEach(t => {
-      const d = new Date(t.date)
-      if (d.getFullYear() !== year) return
-      const m = d.getMonth()
-      const rate = getSafeRate(t.date)
-      months[m].salaryChf += safeNumber(t.amount) / rate
-      months[m].rate = rate
+    // salaryTxs aslında fatih_monthly_salaries kayıtlarıdır:
+    //   { year, month, amount_chf, amount_try, chf_to_try_rate, ... }
+    // Daha önce burada transaction varmış gibi t.date / t.amount okunuyordu,
+    // bu yüzden Hakediş tablosundaki Maaş tutarı sürekli 0 çıkıyordu.
+    fatihData.salaryTxs.forEach(sal => {
+      if (sal.year !== year) return
+      const m = sal.month
+      if (m == null || m < 0 || m > 11) return
+      months[m].salaryChf += safeNumber(sal.amount_chf)
+      const rate = safeNumber(sal.chf_to_try_rate, 36)
+      if (rate > 0) months[m].rate = rate
     })
 
     fatihData.frenchTxs.forEach(t => {
