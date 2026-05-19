@@ -3,6 +3,7 @@ import { Icon, fmtTL, monthName, monthFull } from '../utils'
 import { useCurrency, fmtCHF } from '../CurrencyContext'
 import { fetchFatihSettings, fetchFatihSalaries, accrueFatihSalary, deleteFatihSalary, getRateForDate } from '../dataService'
 import { isFatihTransferTx } from '../fatihHelper'
+import { PaymentPieChart } from '../charts'
 
 const safeNumber = (v, def = 0) => {
   const n = parseFloat(v)
@@ -271,7 +272,7 @@ function SummaryView({ fatihData, settings, salaries, onAddSalary, handleDeleteS
       }}>
         <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--accent)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>FK</div>
         <div style={{ fontSize: 12, color: 'var(--ink)', lineHeight: 1.5 }}>
-          <strong>Fatih Karakaş Cari Hesabı:</strong> Başlangıç bakiyesi <strong className="mono">{fmtCHF(fatihData.initialChf)} ({fmtTL(fatihData.initialTry)})</strong> · {settingsDateStr} itibarıyla. Aylık maaş varsayılan: <strong>{salaryAmount} CHF</strong>. Kartlara tıklayarak detayları görebilirsin.
+          <strong>Fatih Karakaş Cari Hesabı:</strong> Başlangıç bakiyesi <strong className="mono">{fmtCHF(fatihData.openingBalanceChf)} ({fmtTL(fatihData.openingBalanceTry)})</strong> · {settingsDateStr} itibarıyla. Aylık maaş varsayılan: <strong>{salaryAmount} CHF</strong>. Kartlara tıklayarak detayları görebilirsin.
         </div>
       </div>
 
@@ -319,43 +320,254 @@ function SummaryView({ fatihData, settings, salaries, onAddSalary, handleDeleteS
         <ClickableCard label="Fatih → Şirket Avans" value={fmtCHF(fatihData.advanceChf)} subtitle={`${fatihData.advanceTxs.length} işlem · ${fmtTL(fatihData.advanceTry)}`} color="amber" icon="arrowUp" onClick={() => setDetailModal({ type: 'advance', title: 'Fatih → Şirket Avansları', txs: fatihData.advanceTxs, color: 'var(--amber)' })} />
       </div>
 
-      <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 22, border: '1px solid var(--line)', marginBottom: 18 }}>
-        <h3 className="display" style={{ fontSize: 15, marginBottom: 14 }}>Bakiye Hesabı</h3>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, lineHeight: 2 }}>
-          <Row label="Başlangıç Bakiyesi" chf={fatihData.initialChf} tl={fatihData.initialTry} sign="" color="var(--ink-soft)" />
-          <Row label="+ Maaş Tahakkukları" chf={fatihData.salaryChf} tl={fatihData.salaryTry} sign="+" color="var(--green)" />
-          <Row label="+ French Team Primleri" chf={fatihData.frenchChf} tl={fatihData.frenchTry} sign="+" color="var(--blue)" />
-          {fatihData.advanceChf > 0 && <Row label="+ Fatih → Şirket Avansları" chf={fatihData.advanceChf} tl={fatihData.advanceTry} sign="+" color="var(--amber)" />}
-          <Row label="− Şirket → Fatih Transferleri" chf={fatihData.transferChf} tl={fatihData.transferTry} sign="−" color="var(--red)" />
-          <div style={{ borderTop: '2px solid var(--accent)', marginTop: 8, paddingTop: 12 }}>
-            <Row label="MEVCUT BAKİYE" chf={fatihData.balanceChf} tl={fatihData.balanceTry} sign="" color={isPositive ? 'var(--green)' : isNegative ? 'var(--red)' : 'var(--ink)'} bold />
+      {/* Donut + Bakiye Hesabı yan yana */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) 1.4fr', gap: 14, marginBottom: 18 }}>
+        <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 18, border: '1px solid var(--line)' }}>
+          <h3 className="display" style={{ fontSize: 14, marginBottom: 10 }}>Borcun Kompozisyonu</h3>
+          <BalanceDonut data={fatihData} />
+        </div>
+
+        <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 22, border: '1px solid var(--line)' }}>
+          <h3 className="display" style={{ fontSize: 15, marginBottom: 14 }}>Bakiye Hesabı</h3>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, lineHeight: 2 }}>
+            <Row label="Başlangıç Bakiyesi" chf={fatihData.openingBalanceChf} tl={fatihData.openingBalanceTry} sign="" color="var(--ink-soft)" />
+            <Row label="+ Maaş Tahakkukları" chf={fatihData.salaryChf} tl={fatihData.salaryTry} sign="+" color="var(--green)" />
+            <Row label="+ French Team Primleri" chf={fatihData.frenchChf} tl={fatihData.frenchTry} sign="+" color="var(--blue)" />
+            <Row label="+ Fatih → Şirket Avansları" chf={fatihData.advanceChf} tl={fatihData.advanceTry} sign="+" color="var(--amber)" />
+            <Row label="− Şirket → Fatih Transferleri" chf={fatihData.transferChf} tl={fatihData.transferTry} sign="−" color="var(--red)" />
+            <div style={{ borderTop: '2px solid var(--accent)', marginTop: 8, paddingTop: 12 }}>
+              <Row label="MEVCUT BAKİYE" chf={fatihData.balanceChf} tl={fatihData.balanceTry} sign="" color={isPositive ? 'var(--green)' : isNegative ? 'var(--red)' : 'var(--ink)'} bold />
+            </div>
           </div>
         </div>
       </div>
 
-      {salaries.length > 0 && (
-        <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 22, border: '1px solid var(--line)' }}>
-          <h3 className="display" style={{ fontSize: 15, marginBottom: 14 }}>Tüm Maaş Tahakkukları</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 130px 130px 40px', gap: 12, padding: '10px 0', borderBottom: '2px solid var(--accent)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 600 }}>
-            <div>Ay</div><div>Kur</div><div style={{ textAlign: 'right' }}>CHF</div><div style={{ textAlign: 'right' }}>TL</div><div></div>
-          </div>
-          {salaries.map(s => (
-            <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 130px 130px 40px', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--line-soft)', alignItems: 'center' }}>
-              <div style={{ fontSize: 13, fontWeight: 500 }}>{monthFull(s.month)} {s.year}</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>1 CHF = {safeNumber(s.chf_to_try_rate).toFixed(4)}</div>
-              <div className="mono" style={{ textAlign: 'right', fontSize: 13, fontWeight: 600, color: 'var(--green)' }}>{fmtCHF(safeNumber(s.amount_chf))}</div>
-              <div className="mono" style={{ textAlign: 'right', fontSize: 13, color: 'var(--ink-soft)' }}>{fmtTL(safeNumber(s.amount_try))}</div>
-              <div>
-                <button onClick={() => handleDeleteSalary(s.id)} style={{ color: 'var(--ink-muted)', padding: 4, background: 'transparent', border: 'none', cursor: 'pointer' }}>
-                  <Icon name="trash" size={13}/>
-                </button>
-              </div>
+      {/* Son hareketler timeline */}
+      <RecentActivityPanel fatihData={fatihData} />
+
+      {/* Sekmeli detay paneli: Maaş / Prim / Transfer / Avans */}
+      <GroupedDetailPanel
+        fatihData={fatihData}
+        salaries={salaries}
+        handleDeleteSalary={handleDeleteSalary}
+      />
+    </div>
+  )
+}
+
+// ============= BORÇ KOMPOZİSYONU DONUT =============
+function BalanceDonut({ data }) {
+  const slices = [
+    { n: 'Açılış Bakiyesi', a: Math.max(0, safeNumber(data.openingBalanceTry)) },
+    { n: 'Maaş Tahakkukları', a: Math.max(0, safeNumber(data.salaryTry)) },
+    { n: 'French Team Primi', a: Math.max(0, safeNumber(data.frenchTry)) },
+    { n: 'Fatih → Şirket Avans', a: Math.max(0, safeNumber(data.advanceTry)) },
+  ].filter(s => s.a > 0)
+
+  const total = slices.reduce((s, x) => s + x.a, 0)
+  if (slices.length === 0 || total === 0) {
+    return <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-muted)', fontSize: 12 }}>Henüz pozitif kalem yok</div>
+  }
+
+  return (
+    <div>
+      <PaymentPieChart data={slices} />
+      <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-muted)', textAlign: 'center' }}>
+        Toplam alacak: <strong style={{ color: 'var(--ink)' }} className="mono">{fmtTL(total)}</strong>
+        {data.transferTry > 0 && <span> · Çekilen: <strong style={{ color: 'var(--red)' }} className="mono">{fmtTL(data.transferTry)}</strong></span>}
+      </div>
+    </div>
+  )
+}
+
+// ============= SON HAREKETLER TIMELINE =============
+function RecentActivityPanel({ fatihData }) {
+  const events = useMemo(() => {
+    const all = []
+    fatihData.salaryTxs.forEach(s => {
+      // Maaş satırlarında date yok, year+month kullanılır → ayın 1'i olarak ele al
+      const d = (s.year != null && s.month != null)
+        ? `${s.year}-${String(s.month + 1).padStart(2, '0')}-01`
+        : null
+      if (!d) return
+      all.push({
+        kind: 'salary',
+        date: d,
+        amount_try: safeNumber(s.amount_try),
+        amount_chf: safeNumber(s.amount_chf),
+        label: `${monthFull(s.month)} ${s.year} maaşı`,
+        sign: '+', color: 'var(--green)', icon: 'users',
+      })
+    })
+    fatihData.frenchTxs.forEach(t => {
+      all.push({
+        kind: 'french', date: t.date,
+        amount_try: safeNumber(t.amount), amount_chf: safeNumber(t.amount) / 54,
+        label: t.description || 'French Team Primi',
+        sign: '+', color: 'var(--blue)', icon: 'spark',
+      })
+    })
+    fatihData.advanceTxs.forEach(t => {
+      all.push({
+        kind: 'advance', date: t.date,
+        amount_try: safeNumber(t.amount), amount_chf: safeNumber(t.amount) / 54,
+        label: t.description ? `Avans: ${t.description}` : `Avans (${t.category})`,
+        sign: '+', color: 'var(--amber)', icon: 'arrowUp',
+      })
+    })
+    fatihData.transferTxs.forEach(t => {
+      all.push({
+        kind: 'transfer', date: t.date,
+        amount_try: safeNumber(t.amount), amount_chf: safeNumber(t.amount) / 54,
+        label: t.description || 'Şirket → Fatih Transferi',
+        sign: '−', color: 'var(--red)', icon: 'arrowDown',
+      })
+    })
+    return all.sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 15)
+  }, [fatihData])
+
+  if (events.length === 0) return null
+
+  return (
+    <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 18, border: '1px solid var(--line)', marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+        <h3 className="display" style={{ fontSize: 15 }}>Son Hareketler</h3>
+        <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{events.length} kayıt</div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {events.map((e, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '36px 90px 1fr 130px', gap: 10, padding: '8px 8px', borderRadius: 6, alignItems: 'center', background: i % 2 === 0 ? 'var(--bg-elevated)' : 'transparent' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.04)', color: e.color, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${e.color}` }}>
+              <Icon name={e.icon} size={13} />
             </div>
+            <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
+              {new Date(e.date).toLocaleDateString('tr-TR')}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.label}>
+              {e.label}
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: e.color }}>{e.sign}{fmtCHF(Math.abs(e.amount_chf))}</div>
+              <div className="mono" style={{ fontSize: 10, color: 'var(--ink-muted)' }}>{e.sign}{fmtTL(Math.abs(e.amount_try))}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============= SEKMELİ DETAY PANELİ =============
+function GroupedDetailPanel({ fatihData, salaries, handleDeleteSalary }) {
+  const [tab, setTab] = useState('salary')
+
+  const tabs = [
+    { key: 'salary',   label: 'Maaşlar',     count: salaries.length, color: 'var(--green)' },
+    { key: 'french',   label: 'Primler',     count: fatihData.frenchTxs.length, color: 'var(--blue)' },
+    { key: 'transfer', label: 'Transferler', count: fatihData.transferTxs.length, color: 'var(--red)' },
+    { key: 'advance',  label: 'Avanslar',    count: fatihData.advanceTxs.length, color: 'var(--amber)' },
+  ]
+
+  return (
+    <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 18, border: '1px solid var(--line)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+        <h3 className="display" style={{ fontSize: 15 }}>Detaylı Döküm</h3>
+        <div style={{ display: 'flex', gap: 4, background: 'var(--bg-input)', border: '1px solid var(--line)', borderRadius: 8, padding: 3 }}>
+          {tabs.map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)} style={{
+              padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+              background: tab === t.key ? t.color : 'transparent',
+              color: tab === t.key ? 'white' : 'var(--ink-muted)',
+              border: 'none', cursor: 'pointer'
+            }}>
+              {t.label} <span style={{ opacity: 0.7, marginLeft: 4 }}>{t.count}</span>
+            </button>
           ))}
         </div>
+      </div>
+
+      {tab === 'salary' && (
+        salaries.length === 0
+          ? <EmptyState text="Henüz maaş tahakkuku yok."/>
+          : <SimpleTable
+              cols={['120px', '1fr', '130px', '130px', '40px']}
+              headers={['Ay', 'Kur', 'CHF', 'TL', '']}
+              rows={salaries.map(s => ({
+                key: s.id,
+                cells: [
+                  <span style={{ fontWeight: 500 }}>{monthFull(s.month)} {s.year}</span>,
+                  <span style={{ color: 'var(--ink-muted)' }}>1 CHF = {safeNumber(s.chf_to_try_rate).toFixed(4)}</span>,
+                  <span className="mono" style={{ textAlign: 'right', fontWeight: 600, color: 'var(--green)' }}>{fmtCHF(safeNumber(s.amount_chf))}</span>,
+                  <span className="mono" style={{ textAlign: 'right', color: 'var(--ink-soft)' }}>{fmtTL(safeNumber(s.amount_try))}</span>,
+                  <button onClick={() => handleDeleteSalary(s.id)} style={{ color: 'var(--ink-muted)', padding: 4, background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                    <Icon name="trash" size={13}/>
+                  </button>,
+                ],
+              }))}
+            />
+      )}
+
+      {tab === 'french' && (
+        fatihData.frenchTxs.length === 0
+          ? <EmptyState text="Henüz French Team primi yok."/>
+          : <TxTable txs={fatihData.frenchTxs} color="var(--blue)" />
+      )}
+      {tab === 'transfer' && (
+        fatihData.transferTxs.length === 0
+          ? <EmptyState text="Henüz Şirket → Fatih transferi yok."/>
+          : <TxTable txs={fatihData.transferTxs} color="var(--red)" />
+      )}
+      {tab === 'advance' && (
+        fatihData.advanceTxs.length === 0
+          ? <EmptyState text="Henüz Fatih → Şirket avansı yok."/>
+          : <TxTable txs={fatihData.advanceTxs} color="var(--amber)" />
       )}
     </div>
   )
+}
+
+function TxTable({ txs, color }) {
+  const sorted = [...txs].sort((a, b) => (a.date < b.date ? 1 : -1))
+  return (
+    <SimpleTable
+      cols={['100px', '1fr', '160px', '120px', '110px']}
+      headers={['Tarih', 'Açıklama', 'Kategori', 'CHF', 'TL']}
+      rows={sorted.map(t => ({
+        key: t.id,
+        cells: [
+          <span style={{ color: 'var(--ink-muted)' }}>{new Date(t.date).toLocaleDateString('tr-TR')}</span>,
+          <span title={t.description} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{t.description || '—'}</span>,
+          <span style={{ color: 'var(--ink-muted)', fontSize: 11 }}>{t.category}</span>,
+          <span className="mono" style={{ textAlign: 'right', fontWeight: 600, color }}>{fmtCHF(safeNumber(t.amount) / 54)}</span>,
+          <span className="mono" style={{ textAlign: 'right', color: 'var(--ink-soft)' }}>{fmtTL(safeNumber(t.amount))}</span>,
+        ],
+      }))}
+    />
+  )
+}
+
+function SimpleTable({ cols, headers, rows }) {
+  const gridTemplate = cols.join(' ')
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <div style={{ minWidth: 600 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: gridTemplate, gap: 12, padding: '8px 8px', borderBottom: '2px solid var(--accent)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700 }}>
+          {headers.map((h, i) => (
+            <div key={i} style={{ textAlign: i >= headers.length - 2 ? 'right' : 'left' }}>{h}</div>
+          ))}
+        </div>
+        {rows.map(r => (
+          <div key={r.key} style={{ display: 'grid', gridTemplateColumns: gridTemplate, gap: 12, padding: '10px 8px', borderBottom: '1px solid var(--line-soft)', fontSize: 12, alignItems: 'center' }}>
+            {r.cells}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EmptyState({ text }) {
+  return <div style={{ padding: 30, textAlign: 'center', color: 'var(--ink-muted)', fontSize: 13 }}>{text}</div>
 }
 
 // ============= MAAŞ TAHAKKUK MODALI (YENİ) =============
