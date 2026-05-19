@@ -89,12 +89,25 @@ export default function FatihAccount({ data, reload }) {
         return String(t.category || '').toLowerCase().includes('fatih karaka')
       })
 
-      // SADECE CHF TOPLAMI - TL HESABI YOK
-      const sumChfOnly = (txs) => txs.reduce((s, t) => s + safeNumber(t.amount), 0)
+      // TL toplamı (kategoride amount TL olarak saklanır)
+      const sumTry = (txs) => txs.reduce((s, t) => s + safeNumber(t.amount), 0)
+      // CHF toplamı (her işlemin tarihindeki kuru kullanarak çevir)
+      const sumChf = (txs) => txs.reduce((s, t) => {
+        const rate = getSafeRate(t.date)
+        return s + (rate > 0 ? safeNumber(t.amount) / rate : 0)
+      }, 0)
 
-      // Maaşlar direkt salaries tablosundan - SADECE CHF
+      // Maaşlar direkt salaries tablosundan
       const salaryChfTotal = (salaries || []).reduce((s, sal) => s + safeNumber(sal.amount_chf), 0)
       const salaryTryTotal = (salaries || []).reduce((s, sal) => s + safeNumber(sal.amount_try), 0)
+
+      // French Team Primi, Fatih→Şirket avans, Şirket→Fatih transfer
+      const frenchTryTotal   = sumTry(frenchTxs)
+      const frenchChfTotal   = sumChf(frenchTxs)
+      const advanceTryTotal  = sumTry(advanceTxs)
+      const advanceChfTotal  = sumChf(advanceTxs)
+      const transferTryTotal = sumTry(transferTxs)
+      const transferChfTotal = sumChf(transferTxs)
 
       // Açılış bakiyesi
       // Settings ekranı `initial_balance_chf`/`initial_balance_try` alanlarına
@@ -107,26 +120,32 @@ export default function FatihAccount({ data, reload }) {
         settings.initial_balance_try ?? openingBalanceChf * 54
       )
 
-      // Toplam bakiye - SADECE CHF
-      const totalChf = openingBalanceChf + salaryChfTotal
-      const totalTry = openingBalanceTry + salaryTryTotal
+      // Şirketin Fatih'e borcu:
+      //   + Açılış bakiyesi
+      //   + Tahakkuk eden maaşlar
+      //   + French Team primleri
+      //   + Fatih'in cebinden ödediği işler (avans)
+      //   - Şirketten Fatih'e yapılan transferler
+      const totalChf = openingBalanceChf + salaryChfTotal + frenchChfTotal + advanceChfTotal - transferChfTotal
+      const totalTry = openingBalanceTry + salaryTryTotal + frenchTryTotal + advanceTryTotal - transferTryTotal
 
       return {
         initialTry: 0,
         initialChf: 0,
         openingBalanceChf,
+        openingBalanceTry,
         salaryTxs: salaries || [],
         salaryTry: salaryTryTotal,
         salaryChf: salaryChfTotal,
         frenchTxs,
-        frenchTry: 0,
-        frenchChf: 0,
+        frenchTry: frenchTryTotal,
+        frenchChf: frenchChfTotal,
         advanceTxs,
-        advanceTry: 0,
-        advanceChf: 0,
+        advanceTry: advanceTryTotal,
+        advanceChf: advanceChfTotal,
         transferTxs,
-        transferTry: 0,
-        transferChf: 0,
+        transferTry: transferTryTotal,
+        transferChf: transferChfTotal,
         balanceTry: totalTry,
         balanceChf: totalChf,
         startDate,
