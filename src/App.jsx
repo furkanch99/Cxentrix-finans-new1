@@ -13,19 +13,44 @@ import Settings from './views/Settings'
 import MonthlyRates from './MonthlyRates'
 import AddModal from './views/AddModal'
 import CurrencyTicker from './CurrencyTicker'
+import Login from './Login'
 import { Icon, LOGO_URL } from './utils'
 import { CurrencyProvider } from './CurrencyContext'
 import { fetchTransactions, fetchCategories, fetchPaymentTypes, fetchPaymentStatuses } from './dataService'
 
 export default function App() {
+  const [session, setSession] = useState(null)
+  const [authReady, setAuthReady] = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setAuthReady(true)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s)
+    })
+    return () => sub.subscription.unsubscribe()
+  }, [])
+
+  if (!authReady) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+        <div className="spinner" style={{ width: 40, height: 40, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%' }}></div>
+      </div>
+    )
+  }
+
+  if (!session) return <Login />
+
   return (
     <CurrencyProvider>
-      <AppInner />
+      <AppInner session={session} />
     </CurrencyProvider>
   )
 }
 
-function AppInner() {
+function AppInner({ session }) {
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('cxentrix-theme') || 'light' } catch { return 'light' }
   })
@@ -84,7 +109,7 @@ function AppInner() {
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <CurrencyTicker />
       <div style={{ display: 'flex', flex: 1 }}>
-        <Sidebar mode={mode} view={view} setView={setView} onAdd={() => setShowAdd(true)} theme={theme} toggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')} user={{ email: 'admin@cxentrix.com' }} />
+        <Sidebar mode={mode} view={view} setView={setView} onAdd={() => setShowAdd(true)} theme={theme} toggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')} user={session?.user || { email: '' }} onLogout={() => supabase.auth.signOut()} />
         <main style={{ flex: 1, padding: '20px 36px 28px', maxWidth: 1600, width: '100%' }}>
           <Header view={view} mode={mode} setMode={setMode} />
           <div className="fade-in">
@@ -107,7 +132,7 @@ function AppInner() {
   )
 }
 
-function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user }) {
+function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onLogout }) {
   const cxentrixItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', section: 'main' },
     { id: 'transactions', label: 'İşlemler', icon: 'list', section: 'main' },
@@ -224,6 +249,11 @@ function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user }) {
         <button onClick={toggleTheme} style={{ width: '100%', padding: '6px 10px', borderRadius: 7, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-muted)', marginBottom: 3 }}>
           <Icon name={theme === 'light' ? 'moon' : 'sun'} size={12} />{theme === 'light' ? 'Koyu Tema' : 'Açık Tema'}
         </button>
+        {onLogout && (
+          <button onClick={onLogout} style={{ width: '100%', padding: '6px 10px', borderRadius: 7, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-muted)' }}>
+            <Icon name="settings" size={12} />Çıkış Yap
+          </button>
+        )}
       </div>
 
       <style>{`
