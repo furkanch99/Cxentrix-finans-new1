@@ -1,15 +1,14 @@
 -- =====================================================================
--- Generated from: C:\Users\furka\Downloads\Transactions-Grid view (9).csv
--- 315 transactions, 20 categories, 8 payment types
+-- Generated from: C:\Users\furka\Downloads\Transactions-Grid view (10).csv
+-- 313 transactions, 20 categories, 8 payment types
 -- Run in Supabase Dashboard → SQL Editor.
 -- =====================================================================
 
 begin;
 
 -- Categories
-insert into public.categories (name, type) values ('SGK', 'expense') on conflict (name, type) do nothing;
-insert into public.categories (name, type) values ('Çalışan Giderleri', 'expense') on conflict (name, type) do nothing;
 insert into public.categories (name, type) values ('Faturalar', 'expense') on conflict (name, type) do nothing;
+insert into public.categories (name, type) values ('Çalışan Giderleri', 'expense') on conflict (name, type) do nothing;
 insert into public.categories (name, type) values ('Ofis Giderleri', 'expense') on conflict (name, type) do nothing;
 insert into public.categories (name, type) values ('Yazılım Hizmetleri', 'expense') on conflict (name, type) do nothing;
 insert into public.categories (name, type) values ('Sunucu & Hosting', 'expense') on conflict (name, type) do nothing;
@@ -19,6 +18,7 @@ insert into public.categories (name, type) values ('Diğer', 'expense') on confl
 insert into public.categories (name, type) values ('LgNet', 'income') on conflict (name, type) do nothing;
 insert into public.categories (name, type) values ('Logic Group AG', 'income') on conflict (name, type) do nothing;
 insert into public.categories (name, type) values ('Vergi', 'expense') on conflict (name, type) do nothing;
+insert into public.categories (name, type) values ('SGK', 'expense') on conflict (name, type) do nothing;
 insert into public.categories (name, type) values ('Taksitler', 'expense') on conflict (name, type) do nothing;
 insert into public.categories (name, type) values ('Telekom Giderleri', 'expense') on conflict (name, type) do nothing;
 insert into public.categories (name, type) values ('Demirbaş', 'expense') on conflict (name, type) do nothing;
@@ -29,8 +29,8 @@ insert into public.categories (name, type) values ('Misafir Masrafları', 'expen
 insert into public.categories (name, type) values ('Avukat Masrafları', 'expense') on conflict (name, type) do nothing;
 
 -- Payment types
-insert into public.payment_types (name) values ('Kuveyttürk - Banka Kartı') on conflict (name) do nothing;
 insert into public.payment_types (name) values ('Kuveyttürk - Kredi Kartı') on conflict (name) do nothing;
+insert into public.payment_types (name) values ('Kuveyttürk - Banka Kartı') on conflict (name) do nothing;
 insert into public.payment_types (name) values ('Furkan Karakaş') on conflict (name) do nothing;
 insert into public.payment_types (name) values ('Fatih Karakaş') on conflict (name) do nothing;
 insert into public.payment_types (name) values ('Gökşin Usta') on conflict (name) do nothing;
@@ -40,8 +40,6 @@ insert into public.payment_types (name) values ('Erdinç') on conflict (name) do
 
 -- Transactions
 insert into public.transactions (type, date, amount, category, payment_type, description) values
-  ('expense', '2025-12-31', 88813, 'SGK', 'Kuveyttürk - Banka Kartı', 'Cari Dönem Prim İşveren SSK'),
-  ('expense', '2025-12-31', 208000, 'Çalışan Giderleri', NULL, 'Aralık 2025 Fatih Karakaş Maaş'),
   ('expense', '2026-01-01', 1095, 'Faturalar', 'Kuveyttürk - Kredi Kartı', 'Elektrik Faturası'),
   ('expense', '2026-01-01', 45000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', '2025 Aralık ayı maaş Gökşin'),
   ('expense', '2026-01-01', 50000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', '2025 Aralık ayı maaş Şaban'),
@@ -113,17 +111,17 @@ insert into public.transactions (type, date, amount, category, payment_type, des
   ('expense', '2026-01-26', 100000, 'Fatih Karakaş', 'Kuveyttürk - Banka Kartı', 'Para Transferi'),
   ('expense', '2026-01-28', 791, 'Vergi', 'Kuveyttürk - Kredi Kartı', 'Kozyatağı Vergi Dairesi'),
   ('expense', '2026-01-29', 4476.72, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Hepsiburada 13.430.16 TL işlemin 3/3 taksidi'),
-  ('expense', '2026-01-30', 120000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Onur Kazan Ocak Maaş + Prim'),
-  ('expense', '2026-01-30', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Gökşin Usta Ocak Maaş + Prim'),
-  ('expense', '2026-01-30', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şaban Baş Ocak Maaş + Prim'),
-  ('expense', '2026-01-30', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Furkan Karakaş Ocak Maaş + Prim'),
-  ('expense', '2026-01-30', 75000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Erdinç Atay Ocak Maaş + Prim'),
-  ('expense', '2026-01-30', 60000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Ali Yurdunol Ocak Maaş + Prim'),
   ('expense', '2026-01-30', 3541.84, 'Vergi', 'Kuveyttürk - Kredi Kartı', 'Nakil Vasıtaları 10625.50TL 1/3 Taksit'),
   ('expense', '2026-01-30', 2004.68, 'Vergi', 'Kuveyttürk - Kredi Kartı', 'Nakil Vasıtaları 6014TL 1/3 Taksit'),
   ('expense', '2026-01-30', 7736.63, 'SGK', 'Kuveyttürk - Kredi Kartı', 'Cari Dönem Prim Kendi Nam ve Hesabına Çalışma'),
   ('expense', '2026-01-30', 98254.78, 'SGK', 'Kuveyttürk - Kredi Kartı', 'Cari Dönem Prim İşveren (SSK)'),
   ('expense', '2026-01-31', 350, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', '2 Tane Damacana Su'),
+  ('expense', '2026-02-01', 120000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Onur Kazan Ocak Maaş + Prim'),
+  ('expense', '2026-02-01', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Gökşin Usta Ocak Maaş + Prim'),
+  ('expense', '2026-02-01', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şaban Baş Ocak Maaş + Prim'),
+  ('expense', '2026-02-01', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Furkan Karakaş Ocak Maaş + Prim'),
+  ('expense', '2026-02-01', 75000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Erdinç Atay Ocak Maaş + Prim'),
+  ('expense', '2026-02-01', 60000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Ali Yurdunol Ocak Maaş + Prim'),
   ('expense', '2026-02-01', 14400, 'Diğer', NULL, 'FYI- Ofis Boya Ücreti'),
   ('expense', '2026-02-01', 4816.33, 'Taksitler', 'Kuveyttürk - Kredi Kartı', 'Hepsiburada'),
   ('expense', '2026-02-01', 8765.36, 'Taksitler', 'Kuveyttürk - Kredi Kartı', 'Hepsiburada'),
@@ -139,11 +137,11 @@ insert into public.transactions (type, date, amount, category, payment_type, des
   ('expense', '2026-02-02', 436.76, 'Yazılım Hizmetleri', 'Kuveyttürk - Kredi Kartı', 'Vapi'),
   ('expense', '2026-02-02', 238.33, 'Sunucu & Hosting', 'Kuveyttürk - Kredi Kartı', 'AWS Amazon'),
   ('expense', '2026-02-02', 873.77, 'Yazılım Hizmetleri', 'Kuveyttürk - Kredi Kartı', 'Chatgpt'),
-  ('expense', '2026-02-03', 263, 'Ofis Giderleri', 'Furkan Karakaş', 'Çamaşır suyu 4 tane');
+  ('expense', '2026-02-03', 263, 'Ofis Giderleri', 'Furkan Karakaş', 'Çamaşır suyu 4 tane'),
+  ('expense', '2026-02-04', 100000, 'Fatih Karakaş', 'Kuveyttürk - Banka Kartı', 'Fatih Karakaş'),
+  ('expense', '2026-02-04', 29635.66, 'Sunucu & Hosting', 'Kuveyttürk - Kredi Kartı', 'Hetzner');
 
 insert into public.transactions (type, date, amount, category, payment_type, description) values
-  ('expense', '2026-02-04', 100000, 'Fatih Karakaş', 'Kuveyttürk - Banka Kartı', 'Fatih Karakaş'),
-  ('expense', '2026-02-04', 29635.66, 'Sunucu & Hosting', 'Kuveyttürk - Kredi Kartı', 'Hetzner'),
   ('expense', '2026-02-04', 239.98, 'Faturalar', 'Kuveyttürk - Kredi Kartı', 'BT Telekom'),
   ('expense', '2026-02-05', 3647, 'Faturalar', 'Kuveyttürk - Kredi Kartı', 'İgdaş'),
   ('expense', '2026-02-05', 1669.22, 'Faturalar', 'Kuveyttürk - Kredi Kartı', 'İski'),
@@ -167,7 +165,7 @@ insert into public.transactions (type, date, amount, category, payment_type, des
   ('expense', '2026-02-16', 18000, 'Muhasebe Masrafları', 'Kuveyttürk - Banka Kartı', 'Muhasebe Bedeli'),
   ('expense', '2026-02-17', 445.9, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Kabinet - 3 Taksit toplam ₺1337.70'),
   ('expense', '2026-02-17', 439.14, 'Yazılım Hizmetleri', 'Kuveyttürk - Kredi Kartı', 'Vapi'),
-  ('expense', '2026-02-18', 1698, 'Çalışan Giderleri', 'Fatih Karakaş', 'Ofise Baklava'),
+  ('expense', '2026-02-18', 1698, 'Ofis Giderleri', 'Fatih Karakaş', 'Ofise Baklava'),
   ('expense', '2026-02-18', 4500, 'Telekom Giderleri', 'Kuveyttürk - Banka Kartı', 'Sigma İletişim'),
   ('expense', '2026-02-18', 100000, 'Kira Giderleri', 'Kuveyttürk - Banka Kartı', 'Ressan Kırgül Kira'),
   ('income', '2026-02-19', 102400, 'Ofis Giderleri', 'Kuveyttürk - Banka Kartı', 'FYI Depozito'),
@@ -181,18 +179,18 @@ insert into public.transactions (type, date, amount, category, payment_type, des
   ('expense', '2026-02-25', 7327, 'Vergi', 'Kuveyttürk - Kredi Kartı', 'Kozyatağı Vergi Dairesi'),
   ('expense', '2026-02-25', 66743.48, 'Vergi', 'Kuveyttürk - Kredi Kartı', 'Kozyatağı Vergi Dairesi'),
   ('expense', '2026-02-27', 600, 'Diğer', 'Furkan Karakaş', 'Noter (Adres Değişikliği)'),
-  ('expense', '2026-02-27', 110000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Onur Maaş'),
-  ('expense', '2026-02-27', 55000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Gökşin Maaş'),
-  ('expense', '2026-02-27', 55000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Şaban Maaş'),
-  ('expense', '2026-02-27', 55000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Furkan Maaş'),
-  ('expense', '2026-02-27', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Erdinç Maaş'),
-  ('expense', '2026-02-27', 50000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Ali Maaş'),
-  ('expense', '2026-02-27', 22992.23, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Arif Maaş'),
   ('expense', '2026-02-27', 792.67, 'Yazılım Hizmetleri', 'Kuveyttürk - Kredi Kartı', 'Paddle'),
   ('income', '2026-02-27', 1901245.19, 'Logic Group AG', NULL, 'Logic Group AG'),
   ('expense', '2026-02-28', 223, 'Sunucu & Hosting', 'Kuveyttürk - Kredi Kartı', 'AWS'),
   ('expense', '2026-02-28', 405.6, 'Faturalar', 'Kuveyttürk - Kredi Kartı', 'BT Telekom'),
   ('expense', '2026-02-28', 1243.75, 'Faturalar', 'Kuveyttürk - Kredi Kartı', 'Türk Telekom'),
+  ('expense', '2026-03-01', 110000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Onur Maaş'),
+  ('expense', '2026-03-01', 55000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Gökşin Maaş'),
+  ('expense', '2026-03-01', 55000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Şaban Maaş'),
+  ('expense', '2026-03-01', 55000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Furkan Maaş'),
+  ('expense', '2026-03-01', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Erdinç Maaş'),
+  ('expense', '2026-03-01', 50000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Ali Maaş'),
+  ('expense', '2026-03-01', 22992.23, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şubat Ayı Arif Maaş'),
   ('expense', '2026-03-02', 70000, 'Çalışan Giderleri', 'Kuveyttürk - Kredi Kartı', 'Multinet 7 Kişi'),
   ('expense', '2026-03-02', 250000, 'Fatih Karakaş', 'Kuveyttürk - Banka Kartı', 'Fatih Karakaş'),
   ('expense', '2026-03-02', 201068.43, 'SGK', 'Kuveyttürk - Banka Kartı', 'SSK İş Prim'),
@@ -219,7 +217,7 @@ insert into public.transactions (type, date, amount, category, payment_type, des
   ('expense', '2026-03-10', 761.21, 'Sunucu & Hosting', 'Kuveyttürk - Kredi Kartı', 'Voip'),
   ('expense', '2026-03-11', 856.77, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Hepsiburada 2507,32 2/3 Taksit'),
   ('expense', '2026-03-12', 132.88, 'Yazılım Hizmetleri', 'Kuveyttürk - Kredi Kartı', 'Paddle'),
-  ('expense', '2026-03-15', 75, 'Çalışan Giderleri', 'Kuveyttürk - Kredi Kartı', 'Trendyol'),
+  ('expense', '2026-03-15', 75, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Trendyol'),
   ('expense', '2026-03-16', 1243.75, 'Faturalar', 'Kuveyttürk - Kredi Kartı', 'Türk Telekom İnternet'),
   ('expense', '2026-03-16', 100000, 'Kira Giderleri', 'Kuveyttürk - Banka Kartı', 'Ressan Kırgül Kira'),
   ('expense', '2026-03-17', 16000, 'Çalışan Giderleri', 'Kuveyttürk - Kredi Kartı', 'MultiGift Bayram Harçlığı'),
@@ -241,11 +239,11 @@ insert into public.transactions (type, date, amount, category, payment_type, des
   ('expense', '2026-03-24', 40000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Onur Kazan Avans'),
   ('expense', '2026-03-24', 50000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Ali Yurdunol Avans'),
   ('expense', '2026-03-25', 2300, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Grill için tüp ve boru'),
-  ('expense', '2026-03-25', 326, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Bim');
+  ('expense', '2026-03-25', 326, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Bim'),
+  ('expense', '2026-03-25', 990, 'Çalışan Giderleri', 'Onur Kazan', 'Onur Köfte'),
+  ('expense', '2026-03-25', 11087.71, 'Seyehat Masrafları', 'Kuveyttürk - Kredi Kartı', 'Priştina Hotel');
 
 insert into public.transactions (type, date, amount, category, payment_type, description) values
-  ('expense', '2026-03-25', 990, 'Çalışan Giderleri', 'Onur Kazan', 'Onur Köfte'),
-  ('expense', '2026-03-25', 11087.71, 'Seyehat Masrafları', 'Kuveyttürk - Kredi Kartı', 'Priştina Hotel'),
   ('expense', '2026-03-25', 250, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Manav'),
   ('expense', '2026-03-26', 81638, 'Vergi', 'Kuveyttürk - Kredi Kartı', '0015 GERÇEK USULDE KATMA DEĞER VERGİSİ'),
   ('expense', '2026-03-26', 7810.47, 'Vergi', 'Kuveyttürk - Kredi Kartı', '4017 KATMA DEĞER VERGİSİ TEVKİFATI'),
@@ -260,41 +258,32 @@ insert into public.transactions (type, date, amount, category, payment_type, des
   ('expense', '2026-03-30', 3541.83, 'Vergi', 'Kuveyttürk - Kredi Kartı', 'Nakil Vasıtaları 10.625 TL 3/3 Taksit'),
   ('expense', '2026-03-30', 2004.66, 'Vergi', 'Kuveyttürk - Kredi Kartı', 'Nakil Vasıtaları 6.014 TL 3/3 Taksit'),
   ('expense', '2026-03-30', 4908, 'Seyehat Masrafları', 'Kuveyttürk - Kredi Kartı', 'Priştina Hotel'),
-  ('expense', '2026-03-31', 80000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Onur Kazan Maaş + 10.000 Prim (40.000TL Avanstan düşülmüştür)'),
-  ('expense', '2026-03-31', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Gökşin Usta Maaş + 10.000 Prim'),
-  ('expense', '2026-03-31', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Furkan Karakaş Maaş + 10.000 Prim'),
-  ('expense', '2026-03-31', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Şaban Baş Maaş + 10.000 Prim'),
-  ('expense', '2026-03-31', 90000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Nebhen Aytaş Maaş + 10.000 Prim'),
-  ('expense', '2026-03-31', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Arif Can Maaş + 10.000 Prim'),
-  ('expense', '2026-03-31', 75000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Erdinç Atay Maaş + 10.000 Prim'),
   ('expense', '2026-04-01', 449.97, 'Çalışan Giderleri', 'Kuveyttürk - Kredi Kartı', 'MousePad 3 Tane'),
   ('expense', '2026-04-01', 4824.08, 'Diğer', 'Kuveyttürk - Kredi Kartı', 'Sigma Telekom'),
   ('expense', '2026-04-01', 90000, 'Çalışan Giderleri', 'Kuveyttürk - Kredi Kartı', 'Multinet 9 Kişi'),
   ('expense', '2026-04-01', 1980, 'Faturalar', 'Kuveyttürk - Kredi Kartı', 'EnerjiSa'),
+  ('expense', '2026-04-01', 80000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Mart Onur Kazan Maaş + 10.000 Prim (40.000TL Avanstan düşülmüştür)'),
+  ('expense', '2026-04-01', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Mart Gökşin Usta Maaş + 10.000 Prim'),
+  ('expense', '2026-04-01', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Mart Furkan Karakaş Maaş + 10.000 Prim'),
+  ('expense', '2026-04-01', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Mart Şaban Baş Maaş + 10.000 Prim'),
+  ('expense', '2026-04-01', 90000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Mart Nebhen Aytaş Maaş + 10.000 Prim'),
+  ('expense', '2026-04-01', 65000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Mart Arif Can Maaş + 10.000 Prim'),
+  ('expense', '2026-04-01', 75000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Mart Erdinç Atay Maaş + 10.000 Prim'),
+  ('expense', '2026-04-01', 3357.67, 'Çalışan Giderleri', 'Kuveyttürk - Kredi Kartı', 'Mart Şaban Baş 2 günlük çalışma bedeli'),
+  ('expense', '2026-04-01', 44920.8, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Mart Tuğba Karakaş'),
   ('expense', '2026-04-01', 6633.6, 'Yazılım Hizmetleri', 'Kuveyttürk - Kredi Kartı', 'GİTHUB'),
   ('expense', '2026-04-01', 458.5, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Bim'),
-  ('expense', '2026-04-01', 57039, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Arif Can Maaş'),
-  ('expense', '2026-04-01', 58336, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Erdinç Atay Maaş'),
-  ('expense', '2026-04-01', 48215, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Furkan Karakaş Maaş'),
-  ('expense', '2026-04-01', 48215, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Gökşin Usta Maaş'),
-  ('expense', '2026-04-01', 95850, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Onur Kazan Maaş'),
-  ('expense', '2026-04-01', 77166, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Nebhen Aytaş Maaş'),
-  ('expense', '2026-04-01', 26558, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Tuğba KarakaşMaaş'),
-  ('expense', '2026-04-01', 49821, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Ali Yurdunol Maaş'),
   ('expense', '2026-04-02', 2981, 'Misafir Masrafları', 'Kuveyttürk - Kredi Kartı', 'Happy Moons'),
   ('expense', '2026-04-02', 2085, 'Misafir Masrafları', 'Kuveyttürk - Kredi Kartı', 'Happy Moons'),
   ('expense', '2026-04-02', 550, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Su'),
   ('expense', '2026-04-02', 1400, 'Misafir Masrafları', 'Kuveyttürk - Kredi Kartı', 'Baklava'),
   ('expense', '2026-04-02', 65000, 'Fatih Karakaş', 'Kuveyttürk - Banka Kartı', 'Fatih Karakaş'),
-  ('expense', '2026-04-02', 3357.67, 'Çalışan Giderleri', 'Kuveyttürk - Kredi Kartı', 'Şaban Baş 2 günlük çalışma bedeli'),
   ('expense', '2026-04-02', 166.09, 'Sunucu & Hosting', 'Kuveyttürk - Kredi Kartı', 'AWS Amazon'),
   ('expense', '2026-04-03', 166.09, 'Telekom Giderleri', 'Kuveyttürk - Kredi Kartı', 'İstanbul Telekom'),
   ('expense', '2026-04-03', 118, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Kuruyemiş'),
   ('expense', '2026-04-04', 893.68, 'Yazılım Hizmetleri', 'Kuveyttürk - Kredi Kartı', 'Chatgpt'),
   ('expense', '2026-04-05', 477.5, 'Ofis Giderleri', 'Kuveyttürk - Banka Kartı', 'Bim'),
-  ('expense', '2026-04-05', 10000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Ali Yurdunol Prim'),
   ('expense', '2026-04-06', 250000, 'Fatih Karakaş', 'Kuveyttürk - Banka Kartı', NULL),
-  ('expense', '2026-04-06', 44920.8, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Tuğba Karakaş'),
   ('expense', '2026-04-06', 10156.73, 'Vergi', 'Kuveyttürk - Banka Kartı', 'Kendi nam ve hesabına çalışma'),
   ('expense', '2026-04-06', 192712.75, 'SGK', 'Kuveyttürk - Banka Kartı', 'Cari Dönem İşveren SSK'),
   ('expense', '2026-04-06', 457, 'Faturalar', 'Kuveyttürk - Kredi Kartı', 'İski'),
@@ -343,9 +332,7 @@ insert into public.transactions (type, date, amount, category, payment_type, des
   ('expense', '2026-04-25', 1353.5, 'Yazılım Hizmetleri', 'Kuveyttürk - Kredi Kartı', 'ANTHROPIC'),
   ('expense', '2026-04-27', 843, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Bim'),
   ('expense', '2026-04-27', 1000, 'Çalışan Giderleri', 'Erdinç', 'Erdinç İstanbul Otobüs'),
-  ('expense', '2026-04-27', 678.1, 'Yazılım Hizmetleri', 'Kuveyttürk - Kredi Kartı', 'Paddle');
-
-insert into public.transactions (type, date, amount, category, payment_type, description) values
+  ('expense', '2026-04-27', 678.1, 'Yazılım Hizmetleri', 'Kuveyttürk - Kredi Kartı', 'Paddle'),
   ('expense', '2026-04-27', 198256.09, 'Vergi', 'Kuveyttürk - Kredi Kartı', 'Alemdağ Vergi Dairesi'),
   ('expense', '2026-04-27', 7262.37, 'Vergi', 'Kuveyttürk - Kredi Kartı', 'Alemdağ Vergi Dairesi'),
   ('expense', '2026-04-27', 1000, 'Çalışan Giderleri', 'Kuveyttürk - Kredi Kartı', 'Erdinç İstanbul Otobüs'),
@@ -355,6 +342,17 @@ insert into public.transactions (type, date, amount, category, payment_type, des
   ('expense', '2026-04-29', 540, 'Yazılım Hizmetleri', 'Kuveyttürk - Kredi Kartı', 'Jetbrains'),
   ('expense', '2026-04-29', 10327, 'Seyehat Masrafları', 'Kuveyttürk - Kredi Kartı', 'Kosova Uçak Bileti'),
   ('expense', '2026-04-30', 261925.03, 'SGK', 'Kuveyttürk - Banka Kartı', 'Cari dönem işveren SSK'),
+  ('expense', '2026-05-01', 10000, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Nisan Ali Yurdunol Prim'),
+  ('expense', '2026-05-01', 57039, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Nisan Arif Can Maaş');
+
+insert into public.transactions (type, date, amount, category, payment_type, description) values
+  ('expense', '2026-05-01', 58336, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Nisan Erdinç Atay Maaş'),
+  ('expense', '2026-05-01', 48215, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Nisan Furkan Karakaş Maaş'),
+  ('expense', '2026-05-01', 48215, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Nisan Gökşin Usta Maaş'),
+  ('expense', '2026-05-01', 95850, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Nisan Onur Kazan Maaş'),
+  ('expense', '2026-05-01', 77166, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Nisan Nebhen Aytaş Maaş'),
+  ('expense', '2026-05-01', 26558, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Nisan Tuğba KarakaşMaaş'),
+  ('expense', '2026-05-01', 49821, 'Çalışan Giderleri', 'Kuveyttürk - Banka Kartı', 'Nisan Ali Yurdunol Maaş'),
   ('expense', '2026-05-04', 21599, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Bahçe Takımı'),
   ('expense', '2026-05-05', 510, 'Ofis Giderleri', 'Kuveyttürk - Kredi Kartı', 'Temizlikçi yemek ücreti'),
   ('expense', '2026-05-05', 56250, 'Avukat Masrafları', 'Kuveyttürk - Banka Kartı', 'Nisan ayı avukat danışmanlık ücreti'),
