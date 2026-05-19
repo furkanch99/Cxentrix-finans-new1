@@ -154,7 +154,8 @@ create table if not exists public.fatih_monthly_salaries (
 
 -- =====================================================================
 -- Row-Level Security
--- Permissive policy: any authenticated user can read/write.
+--   READ : anyone (anon + authenticated) — single-tenant internal app
+--   WRITE: only authenticated users
 -- Tighten later if multi-tenant rules are needed.
 -- =====================================================================
 do $$
@@ -168,11 +169,27 @@ declare
 begin
   foreach t in array tables loop
     execute format('alter table public.%I enable row level security;', t);
+
+    -- legacy policy name from a previous revision; drop if present
     execute format('drop policy if exists "auth_all_%s" on public.%I;', t, t);
+
+    execute format('drop policy if exists "read_all_%s" on public.%I;', t, t);
     execute format(
-      'create policy "auth_all_%s" on public.%I
+      'create policy "read_all_%s" on public.%I
+        for select to anon, authenticated using (true);',
+      t, t
+    );
+
+    execute format('drop policy if exists "write_all_%s" on public.%I;', t, t);
+    execute format(
+      'create policy "write_all_%s" on public.%I
         for all to authenticated using (true) with check (true);',
       t, t
     );
   end loop;
 end $$;
+
+-- Refresh PostgREST schema cache so newly created tables become
+-- visible over the Supabase REST API without waiting for the next
+-- automatic reload.
+notify pgrst, 'reload schema';
