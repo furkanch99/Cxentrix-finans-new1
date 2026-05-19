@@ -1,0 +1,832 @@
+import React, { useState, useEffect, useMemo } from 'react'
+import { Icon, fmtTL, monthName, monthFull } from '../utils'
+import { useCurrency, fmtCHF } from '../CurrencyContext'
+import { fetchFatihSettings, fetchFatihSalaries, accrueFatihSalary, deleteFatihSalary, getRateForDate } from '../dataService'
+
+const safeNumber = (v, def = 0) => {
+  const n = parseFloat(v)
+  return isNaN(n) || !isFinite(n) ? def : n
+}
+const safeRate = (rate) => {
+  const r = parseFloat(rate)
+  if (!r || isNaN(r) || !isFinite(r) || r <= 0) return 36
+  return r
+}
+const safeDate = (date) => {
+  if (!date) return null
+  try {
+    const d = new Date(date)
+    if (isNaN(d.getTime())) return null
+    return d
+  } catch { return null }
+}
+
+export default function FatihAccount({ data, reload }) {
+  const currency = useCurrency()
+  const getRateAt = currency?.getRateAt || (() => 36)
+
+  const [tab, setTab] = useState('summary')
+  const [settings, setSettings] = useState(null)
+  const [salaries, setSalaries] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showSalaryModal, setShowSalaryModal] = useState(false)
+  const [detailModal, setDetailModal] = useState(null)
+  const [loadError, setLoadError] = useState(null)
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const [s, sal] = await Promise.all([
+        fetchFatihSettings().catch(() => null),
+        fetchFatihSalaries().catch(() => [])
+      ])
+      setSettings(s)
+      setSalaries(Array.isArray(sal) ? sal : [])
+    } catch (err) {
+      setLoadError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getSafeRate = (date) => {
+    if (!date) return 36
+    try { return safeRate(getRateAt(date)) } catch { return 36 }
+  }
+
+  const fatihData = useMemo(() => {
+    try {
+      if (!settings) return null
+      
+      const allTxs = (data && Array.isArray(data.transactions)) ? data.transactions : []
+      const startDate = settings.initial_balance_date || '2026-05-01'
+      
+      // French Team Primi işlemleri
+      const frenchTxs = allTxs.filter(t => {
+        if (!t || t.type !== 'expense') return false
+        if (!t.date || t.date < startDate) return false
+        return String(t.category || '').toLowerCase().includes('french team')
+      })
+
+      // Fatih'in şirkete avans verdiği işlemler
+      const advanceTxs = allTxs.filter(t => {
+        if (!t || t.type !== 'expense') return false
+        if (!t.date || t.date < startDate) return false
+        const cat = String(t.category || '').toLowerCase()
+        const pay = String(t.paymentType || '').toLowerCase()
+        return pay.includes('fatih') && !cat.includes('fatih') && !cat.includes('french team')
+      })
+
+      // Şirket'ten Fatih'e transfer
+      const transferTxs = allTxs.filter(t => {
+        if (!t || t.type !== 'expense') return false
+        if (!t.date || t.date < startDate) return false
+        return String(t.category || '').toLowerCase().includes('fatih karaka')
+      })
+
+      // SADECE CHF TOPLAMI - TL HESABI YOK
+      const sumChfOnly = (txs) => txs.reduce((s, t) => s + safeNumber(t.amount), 0)
+
+      // Maaşlar direkt salaries tablosundan - SADECE CHF
+      const salaryChfTotal = (salaries || []).reduce((s, sal) => s + safeNumber(sal.amount_chf), 0)
+      const salaryTryTotal = (salaries || []).reduce((s, sal) => s + safeNumber(sal.amount_try), 0)
+
+      // Açılış bakiyesi
+      const openingBalanceChf = safeNumber(settings.opening_balance_chf)
+      const openingBalanceTry = openingBalanceChf * 54
+
+      // Toplam bakiye - SADECE CHF
+      const totalChf = openingBalanceChf + salaryChfTotal
+      const totalTry = openingBalanceTry + salaryTryTotal
+
+      return {
+        initialTry: 0,
+        initialChf: 0,
+        openingBalanceChf,
+        salaryTxs: salaries || [],
+        salaryTry: salaryTryTotal,
+        salaryChf: salaryChfTotal,
+        frenchTxs,
+        frenchTry: 0,
+        frenchChf: 0,
+        advanceTxs,
+        advanceTry: 0,
+        advanceChf: 0,
+        transferTxs,
+        transferTry: 0,
+        transferChf: 0,
+        balanceTry: totalTry,
+        balanceChf: totalChf,
+        startDate,
+      }
+    } catch (err) {
+      console.error(err)
+      return null
+    }
+  }, [data, settings, salaries, getSafeRate])
+
+  const handleDeleteSalary = async (id) => {
+    if (!confirm('Bu maaş tahakkukunu silmek istediğine emin misin? İlişkili gider de silinecek.')) return
+    try {
+      await deleteFatihSalary(id)
+      await loadData()
+      if (reload) await reload()
+    } catch (err) {
+      alert('Hata: ' + err.message)
+    }
+  }
+
+  if (loading) {
+    return <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-muted)' }}>
+      <div className="spinner" style={{ width: 30, height: 30, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%', margin: '0 auto 12px' }}></div>
+      Fatih hesabı yükleniyor...
+    </div>
+  }
+
+  if (loadError) {
+    return <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 24, color: '#991b1b' }}>
+      <h3>⚠ Hata: {loadError}</h3>
+      <button onClick={loadData} style={{ marginTop: 12, padding: '8px 16px', background: '#ef4444', color: 'white', borderRadius: 6 }}>Tekrar Dene</button>
+    </div>
+  }
+
+  if (!settings) {
+    return <div style={{ background: 'var(--amber-soft, #fef3c7)', border: '1px solid var(--amber, #f59e0b)', borderRadius: 12, padding: 30, textAlign: 'center' }}>
+      <h3>Fatih Ayarları Bulunamadı</h3>
+      <p style={{ fontSize: 13 }}>Önce <strong>Ayarlar → Fatih Karakaş</strong> sekmesinden ayarları girin.</p>
+    </div>
+  }
+
+  if (!fatihData) return <div style={{ padding: 40 }}>Veri hazırlanamadı.</div>
+
+  return (
+    <div>
+      <div style={{ display: 'flex', background: 'var(--bg-card)', border: '1px solid var(--line)', borderRadius: 10, padding: 4, marginBottom: 18, position: 'relative', width: 'fit-content' }}>
+        <div style={{
+          position: 'absolute', top: 4, bottom: 4,
+          left: tab === 'summary' ? 4 : '50%',
+          width: 'calc(50% - 4px)',
+          background: 'var(--gradient-1)', borderRadius: 7,
+          transition: 'left 0.25s ease',
+          boxShadow: '0 2px 8px rgba(99, 102, 241, 0.3)', zIndex: 0
+        }}/>
+        <button onClick={() => setTab('summary')} style={{
+          padding: '9px 20px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+          color: tab === 'summary' ? 'white' : 'var(--ink-muted)',
+          background: 'transparent', position: 'relative', zIndex: 1,
+          display: 'flex', alignItems: 'center', gap: 6, border: 'none', cursor: 'pointer'
+        }}>
+          <Icon name="wallet" size={13} /> Cari Hesap
+        </button>
+        <button onClick={() => setTab('hakedis')} style={{
+          padding: '9px 20px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+          color: tab === 'hakedis' ? 'white' : 'var(--ink-muted)',
+          background: 'transparent', position: 'relative', zIndex: 1,
+          display: 'flex', alignItems: 'center', gap: 6, border: 'none', cursor: 'pointer'
+        }}>
+          <Icon name="chart" size={13} /> Hakediş Tablosu
+        </button>
+      </div>
+
+      {tab === 'summary' ? (
+        <SummaryView
+          fatihData={fatihData}
+          settings={settings}
+          salaries={salaries}
+          onAddSalary={() => setShowSalaryModal(true)}
+          handleDeleteSalary={handleDeleteSalary}
+          setDetailModal={setDetailModal}
+        />
+      ) : (
+        <HakedisView
+          fatihData={fatihData}
+          settings={settings}
+          getSafeRate={getSafeRate}
+        />
+      )}
+
+      {detailModal && <DetailModal modal={detailModal} onClose={() => setDetailModal(null)} getSafeRate={getSafeRate} />}
+      {showSalaryModal && (
+        <AccrueSalaryModal
+          settings={settings}
+          existingSalaries={salaries}
+          onClose={() => setShowSalaryModal(false)}
+          onSuccess={async () => { await loadData(); if (reload) await reload(); setShowSalaryModal(false) }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ============= CARI HESAP GÖRÜNÜMÜ =============
+function SummaryView({ fatihData, settings, salaries, onAddSalary, handleDeleteSalary, setDetailModal }) {
+  const isPositive = fatihData.balanceTry > 0
+  const isNegative = fatihData.balanceTry < 0
+  const salaryAmount = safeNumber(settings.monthly_salary_chf, 4000)
+  const settingsDate = safeDate(settings.initial_balance_date)
+  const settingsDateStr = settingsDate ? settingsDate.toLocaleDateString('tr-TR') : '—'
+
+  return (
+    <div className="fade-in">
+      <div style={{
+        background: 'var(--accent-soft)', border: '1px solid var(--accent)',
+        borderRadius: 12, padding: '12px 16px', marginBottom: 18,
+        display: 'flex', alignItems: 'flex-start', gap: 12
+      }}>
+        <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--accent)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>FK</div>
+        <div style={{ fontSize: 12, color: 'var(--ink)', lineHeight: 1.5 }}>
+          <strong>Fatih Karakaş Cari Hesabı:</strong> Başlangıç bakiyesi <strong className="mono">{fmtCHF(fatihData.initialChf)} ({fmtTL(fatihData.initialTry)})</strong> · {settingsDateStr} itibarıyla. Aylık maaş varsayılan: <strong>{salaryAmount} CHF</strong>. Kartlara tıklayarak detayları görebilirsin.
+        </div>
+      </div>
+
+      <div className="glow-card" style={{
+        background: isPositive ? 'var(--gradient-1)' : isNegative ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'var(--bg-card)',
+        color: (isPositive || isNegative) ? 'white' : 'var(--ink)',
+        border: (isPositive || isNegative) ? 'none' : '1px solid var(--line)',
+        borderRadius: 16, padding: '28px 32px', marginBottom: 24,
+        position: 'relative', overflow: 'hidden',
+        boxShadow: isPositive ? '0 8px 32px rgba(99, 102, 241, 0.3)' : isNegative ? '0 8px 32px rgba(239, 68, 68, 0.3)' : 'var(--shadow-md)'
+      }}>
+        <div style={{ position: 'absolute', top: -60, right: -60, width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)' }}/>
+        <div style={{ position: 'relative' }}>
+          <div style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', opacity: 0.85, fontWeight: 600, marginBottom: 10 }}>
+            {isPositive ? "Şirket Fatih'e Borçlu" : isNegative ? "Fatih Şirkete Borçlu" : "Bakiye Eşit"}
+          </div>
+          <div className="mono" style={{ fontSize: 42, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 6 }}>{fmtCHF(Math.abs(fatihData.balanceChf))}</div>
+          <div className="mono" style={{ fontSize: 20, opacity: 0.85 }}>≈ {fmtTL(Math.abs(fatihData.balanceTry))}</div>
+        </div>
+      </div>
+
+      {/* MAAŞ EKLE BUTONU */}
+      <div style={{
+        background: 'var(--bg-card)', border: '1px solid var(--line)',
+        borderRadius: 12, padding: '14px 18px', marginBottom: 20,
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, flexWrap: 'wrap'
+      }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Maaş Tahakkuk Etme</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>İstediğin ay için CHF ve kur değerlerini elle girerek maaş ekle</div>
+        </div>
+        <button onClick={onAddSalary} style={{
+          background: 'var(--gradient-1)', color: 'white', padding: '9px 16px',
+          borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          border: 'none', display: 'flex', alignItems: 'center', gap: 6
+        }}>
+          <Icon name="plus" size={13}/> Yeni Maaş Ekle
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+        <ClickableCard label="Toplam Maaş" value={fmtCHF(fatihData.salaryChf)} subtitle={`${fatihData.salaryTxs.length} ay · ${fmtTL(fatihData.salaryTry)}`} color="green" icon="users" onClick={() => setDetailModal({ type: 'salary', title: 'Maaş Tahakkukları', txs: fatihData.salaryTxs, color: 'var(--green)' })} />
+        <ClickableCard label="French Team Primi" value={fmtCHF(fatihData.frenchChf)} subtitle={`${fatihData.frenchTxs.length} kayıt · ${fmtTL(fatihData.frenchTry)}`} color="blue" icon="spark" onClick={() => setDetailModal({ type: 'french', title: 'French Team Primi', txs: fatihData.frenchTxs, color: 'var(--blue)' })} />
+        <ClickableCard label="Şirket → Fatih Transfer" value={fmtCHF(fatihData.transferChf)} subtitle={`${fatihData.transferTxs.length} işlem · ${fmtTL(fatihData.transferTry)}`} color="red" icon="arrowDown" onClick={() => setDetailModal({ type: 'transfer', title: 'Şirket → Fatih Transferleri', txs: fatihData.transferTxs, color: 'var(--red)' })} />
+        <ClickableCard label="Fatih → Şirket Avans" value={fmtCHF(fatihData.advanceChf)} subtitle={`${fatihData.advanceTxs.length} işlem · ${fmtTL(fatihData.advanceTry)}`} color="amber" icon="arrowUp" onClick={() => setDetailModal({ type: 'advance', title: 'Fatih → Şirket Avansları', txs: fatihData.advanceTxs, color: 'var(--amber)' })} />
+      </div>
+
+      <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 22, border: '1px solid var(--line)', marginBottom: 18 }}>
+        <h3 className="display" style={{ fontSize: 15, marginBottom: 14 }}>Bakiye Hesabı</h3>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, lineHeight: 2 }}>
+          <Row label="Başlangıç Bakiyesi" chf={fatihData.initialChf} tl={fatihData.initialTry} sign="" color="var(--ink-soft)" />
+          <Row label="+ Maaş Tahakkukları" chf={fatihData.salaryChf} tl={fatihData.salaryTry} sign="+" color="var(--green)" />
+          <Row label="+ French Team Primleri" chf={fatihData.frenchChf} tl={fatihData.frenchTry} sign="+" color="var(--blue)" />
+          {fatihData.advanceChf > 0 && <Row label="+ Fatih → Şirket Avansları" chf={fatihData.advanceChf} tl={fatihData.advanceTry} sign="+" color="var(--amber)" />}
+          <Row label="− Şirket → Fatih Transferleri" chf={fatihData.transferChf} tl={fatihData.transferTry} sign="−" color="var(--red)" />
+          <div style={{ borderTop: '2px solid var(--accent)', marginTop: 8, paddingTop: 12 }}>
+            <Row label="MEVCUT BAKİYE" chf={fatihData.balanceChf} tl={fatihData.balanceTry} sign="" color={isPositive ? 'var(--green)' : isNegative ? 'var(--red)' : 'var(--ink)'} bold />
+          </div>
+        </div>
+      </div>
+
+      {salaries.length > 0 && (
+        <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 22, border: '1px solid var(--line)' }}>
+          <h3 className="display" style={{ fontSize: 15, marginBottom: 14 }}>Tüm Maaş Tahakkukları</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 130px 130px 40px', gap: 12, padding: '10px 0', borderBottom: '2px solid var(--accent)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 600 }}>
+            <div>Ay</div><div>Kur</div><div style={{ textAlign: 'right' }}>CHF</div><div style={{ textAlign: 'right' }}>TL</div><div></div>
+          </div>
+          {salaries.map(s => (
+            <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 130px 130px 40px', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--line-soft)', alignItems: 'center' }}>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{monthFull(s.month)} {s.year}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>1 CHF = {safeNumber(s.chf_to_try_rate).toFixed(4)}</div>
+              <div className="mono" style={{ textAlign: 'right', fontSize: 13, fontWeight: 600, color: 'var(--green)' }}>{fmtCHF(safeNumber(s.amount_chf))}</div>
+              <div className="mono" style={{ textAlign: 'right', fontSize: 13, color: 'var(--ink-soft)' }}>{fmtTL(safeNumber(s.amount_try))}</div>
+              <div>
+                <button onClick={() => handleDeleteSalary(s.id)} style={{ color: 'var(--ink-muted)', padding: 4, background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                  <Icon name="trash" size={13}/>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============= MAAŞ TAHAKKUK MODALI (YENİ) =============
+function AccrueSalaryModal({ settings, existingSalaries, onClose, onSuccess }) {
+  const now = new Date()
+  const defaultSalary = safeNumber(settings.monthly_salary_chf, 4000)
+
+  const [year, setYear] = useState(now.getFullYear())
+  const [month, setMonth] = useState(now.getMonth())
+  const [salaryChf, setSalaryChf] = useState(defaultSalary.toString())
+  const [rate, setRate] = useState('')
+  const [autoRate, setAutoRate] = useState(null)
+  const [loadingRate, setLoadingRate] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Bu ay-yıl için kayıt var mı?
+  const isAlreadyAccrued = useMemo(() => {
+    return existingSalaries.some(s => s.year === year && s.month === month)
+  }, [existingSalaries, year, month])
+
+  // Otomatik kur (ay başı)
+  useEffect(() => {
+    const fetchAutoRate = async () => {
+      setLoadingRate(true)
+      try {
+        const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
+        const rateData = await getRateForDate(monthStart)
+        if (rateData && rateData.chf_to_try) {
+          const v = parseFloat(rateData.chf_to_try)
+          setAutoRate(v)
+          setRate(v.toFixed(4))
+        } else {
+          setAutoRate(null)
+          setRate('36.0000')
+        }
+      } catch (err) {
+        setAutoRate(null)
+        setRate('36.0000')
+      } finally {
+        setLoadingRate(false)
+      }
+    }
+    fetchAutoRate()
+  }, [year, month])
+
+  const salaryNum = parseFloat(salaryChf) || 0
+  const rateNum = parseFloat(rate) || 0
+  const totalTry = salaryNum * rateNum
+  const isRateManual = autoRate !== null && Math.abs(rateNum - autoRate) > 0.001
+  const isSalaryManual = Math.abs(salaryNum - defaultSalary) > 0.001
+
+  const handleSave = async () => {
+    if (isAlreadyAccrued) {
+      alert(`${monthFull(month)} ${year} için maaş zaten tahakkuk ettirilmiş!`)
+      return
+    }
+    if (salaryNum <= 0) {
+      alert('Geçerli bir maaş tutarı girin (CHF).')
+      return
+    }
+    if (rateNum <= 0) {
+      alert('Geçerli bir kur girin.')
+      return
+    }
+
+    if (!confirm(`${monthFull(month)} ${year} için ${salaryNum} CHF maaş tahakkuk edilecek.\nKur: 1 CHF = ${rateNum.toFixed(4)} TL\nToplam: ${fmtTL(totalTry)}\n\nOnaylıyor musun?`)) return
+
+    setSaving(true)
+    try {
+      // Hem kur hem CHF manuel olabilir - dataService'e ikisini de geçeceğiz
+      await accrueFatihSalary(year, month, salaryNum, isRateManual ? rateNum : null)
+      onSuccess()
+    } catch (err) {
+      alert('Hata: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const resetRateToAuto = () => {
+    if (autoRate) setRate(autoRate.toFixed(4))
+  }
+
+  const resetSalaryToDefault = () => {
+    setSalaryChf(defaultSalary.toString())
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(15, 17, 23, 0.6)',
+      backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 100, padding: 20
+    }}>
+      <div onClick={e => e.stopPropagation()} className="fade-in" style={{
+        background: 'var(--bg-card)', borderRadius: 16, padding: 28,
+        width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto',
+        boxShadow: 'var(--shadow-lg)'
+      }}>
+        <h2 className="display gradient-text" style={{ fontSize: 22, marginBottom: 4 }}>Yeni Maaş Tahakkuk</h2>
+        <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginBottom: 20 }}>
+          Tüm değerler düzenlenebilir — istediğin ay, tutar ve kur için maaş ekle
+        </p>
+
+        {/* AY/YIL */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>Yıl</label>
+            <select value={year} onChange={e => setYear(Number(e.target.value))} style={{ width: '100%', padding: '10px 12px', fontSize: 13 }}>
+              {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>Ay</label>
+            <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ width: '100%', padding: '10px 12px', fontSize: 13 }}>
+              {Array.from({length: 12}, (_, i) => <option key={i} value={i}>{monthFull(i)}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Mevcut mu uyarısı */}
+        {isAlreadyAccrued && (
+          <div style={{
+            background: 'var(--red-soft)', border: '1px solid var(--red)',
+            borderRadius: 8, padding: '8px 12px', marginBottom: 14,
+            fontSize: 11, color: 'var(--red)', fontWeight: 600
+          }}>
+            ⚠ {monthFull(month)} {year} için maaş zaten kaydedilmiş. Önce eski kaydı silin.
+          </div>
+        )}
+
+        {/* MAAŞ TUTARI - MANUEL */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>
+            <span>Maaş Tutarı (CHF) {isSalaryManual && <span style={{ background: 'var(--amber)', color: 'white', padding: '2px 6px', borderRadius: 4, marginLeft: 6, letterSpacing: 'normal', textTransform: 'none' }}>FARKLI</span>}</span>
+            {isSalaryManual && (
+              <button onClick={resetSalaryToDefault} style={{ background: 'transparent', border: 'none', color: 'var(--accent)', fontSize: 10, cursor: 'pointer', textTransform: 'none', letterSpacing: 'normal' }}>
+                ↶ Varsayılana Dön ({defaultSalary} CHF)
+              </button>
+            )}
+          </label>
+          <input
+            type="number" step="0.01" min="0"
+            value={salaryChf}
+            onChange={e => setSalaryChf(e.target.value)}
+            placeholder="4000.00"
+            style={{
+              width: '100%', padding: '10px 12px', fontSize: 14,
+              fontFamily: "'JetBrains Mono', monospace", fontWeight: 600,
+              border: isSalaryManual ? '2px solid var(--amber)' : '1px solid var(--line)',
+              background: isSalaryManual ? 'var(--amber-soft, #fef3c7)' : 'var(--bg-input)'
+            }}
+          />
+          <div style={{ fontSize: 10, color: 'var(--ink-muted)', marginTop: 4 }}>
+            Varsayılan ayarlar: {defaultSalary} CHF · İstediğin ay için farklı bir tutar girebilirsin
+          </div>
+        </div>
+
+        {/* KUR - MANUEL */}
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>
+            <span>CHF → TL Kuru {isRateManual && <span style={{ background: 'var(--amber)', color: 'white', padding: '2px 6px', borderRadius: 4, marginLeft: 6, letterSpacing: 'normal', textTransform: 'none' }}>MANUEL</span>}</span>
+            {autoRate && isRateManual && (
+              <button onClick={resetRateToAuto} style={{ background: 'transparent', border: 'none', color: 'var(--accent)', fontSize: 10, cursor: 'pointer', textTransform: 'none', letterSpacing: 'normal' }}>
+                ↶ Otomatik ({autoRate.toFixed(4)})
+              </button>
+            )}
+          </label>
+          <input
+            type="number" step="0.0001" min="0"
+            value={rate}
+            onChange={e => setRate(e.target.value)}
+            placeholder={loadingRate ? 'Yükleniyor...' : '36.0000'}
+            style={{
+              width: '100%', padding: '10px 12px', fontSize: 14,
+              fontFamily: "'JetBrains Mono', monospace", fontWeight: 600,
+              border: isRateManual ? '2px solid var(--amber)' : '1px solid var(--line)',
+              background: isRateManual ? 'var(--amber-soft, #fef3c7)' : 'var(--bg-input)'
+            }}
+          />
+          <div style={{ fontSize: 10, color: 'var(--ink-muted)', marginTop: 4 }}>
+            {loadingRate ? 'Otomatik kur yükleniyor...' :
+              autoRate ? `Sistem kuru: ${autoRate.toFixed(4)} TL (${monthFull(month)} ${year} ay başı) · İstersen değiştir` :
+              'Sistem kuru bulunamadı, lütfen elden gir'}
+          </div>
+        </div>
+
+        {/* HESAPLAMA ÖZETI */}
+        <div style={{
+          background: 'var(--accent-soft)', border: '1px solid var(--accent)',
+          borderRadius: 12, padding: '14px 16px', marginBottom: 18
+        }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 700, marginBottom: 8 }}>Tahakkuk Özeti</div>
+          <div style={{ display: 'grid', gap: 6, fontSize: 13 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--ink-muted)' }}>Dönem</span>
+              <span style={{ fontWeight: 600 }}>{monthFull(month)} {year}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--ink-muted)' }}>Maaş CHF</span>
+              <span className="mono" style={{ fontWeight: 600 }}>{fmtCHF(salaryNum)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--ink-muted)' }}>Kur</span>
+              <span className="mono">{rateNum.toFixed(4)} {isRateManual && <span style={{ color: 'var(--amber)', fontSize: 10, marginLeft: 4 }}>(manuel)</span>}</span>
+            </div>
+            <div style={{ borderTop: '1px solid var(--accent)', paddingTop: 6, display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 15 }}>
+              <span>TL Karşılığı</span>
+              <span className="mono" style={{ color: 'var(--green)' }}>{fmtTL(totalTry)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '10px 18px', borderRadius: 8, background: 'var(--bg-input)', border: '1px solid var(--line)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>İptal</button>
+          <button onClick={handleSave} disabled={saving || isAlreadyAccrued || salaryNum <= 0 || rateNum <= 0} style={{
+            padding: '10px 20px', borderRadius: 8,
+            background: 'var(--gradient-1)', color: 'white',
+            border: 'none', fontSize: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
+            opacity: (saving || isAlreadyAccrued || salaryNum <= 0 || rateNum <= 0) ? 0.5 : 1
+          }}>
+            {saving ? 'Kaydediliyor...' : 'Maaşı Tahakkuk Ettir'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============= HAKEDİŞ TABLOSU =============
+function HakedisView({ fatihData, settings, getSafeRate }) {
+  const [year, setYear] = useState(new Date().getFullYear())
+
+  const availableYears = useMemo(() => {
+    const ys = new Set()
+    fatihData.salaryTxs.forEach(t => ys.add(new Date(t.date).getFullYear()))
+    fatihData.frenchTxs.forEach(t => ys.add(new Date(t.date).getFullYear()))
+    fatihData.transferTxs.forEach(t => ys.add(new Date(t.date).getFullYear()))
+    ys.add(new Date().getFullYear())
+    return Array.from(ys).sort((a,b) => b-a)
+  }, [fatihData])
+
+  const monthlyHakedis = useMemo(() => {
+    const months = Array.from({length: 12}, (_, m) => ({
+      month: m, hakedisChf: 0, salaryChf: 0, frenchChf: 0,
+      transferTry: 0, transferChf: 0, rate: 36
+    }))
+
+    fatihData.salaryTxs.forEach(t => {
+      const d = new Date(t.date)
+      if (d.getFullYear() !== year) return
+      const m = d.getMonth()
+      const rate = getSafeRate(t.date)
+      months[m].salaryChf += safeNumber(t.amount) / rate
+      months[m].rate = rate
+    })
+
+    fatihData.frenchTxs.forEach(t => {
+      const d = new Date(t.date)
+      if (d.getFullYear() !== year) return
+      const m = d.getMonth()
+      const rate = getSafeRate(t.date)
+      months[m].frenchChf += safeNumber(t.amount) / rate
+      months[m].rate = rate
+    })
+
+    fatihData.transferTxs.forEach(t => {
+      const d = new Date(t.date)
+      if (d.getFullYear() !== year) return
+      const m = d.getMonth()
+      const rate = getSafeRate(t.date)
+      months[m].transferTry += safeNumber(t.amount)
+      months[m].transferChf += safeNumber(t.amount) / rate
+      months[m].rate = rate
+    })
+
+    months.forEach(m => {
+      m.hakedisChf = m.salaryChf + m.frenchChf
+      m.hakedisTry = m.hakedisChf * m.rate
+      m.kalanChf = m.hakedisChf - m.transferChf
+      m.kalanTry = m.kalanChf * m.rate
+    })
+
+    return months
+  }, [fatihData, year, getSafeRate])
+
+  const activeMonths = monthlyHakedis.filter(m => m.hakedisChf > 0 || m.transferChf > 0)
+  const totalHakedisChf = activeMonths.reduce((s, m) => s + m.hakedisChf, 0)
+  const totalHakedisTry = activeMonths.reduce((s, m) => s + m.hakedisTry, 0)
+  const totalTransferTry = activeMonths.reduce((s, m) => s + m.transferTry, 0)
+  const totalTransferChf = activeMonths.reduce((s, m) => s + m.transferChf, 0)
+  const totalKalanChf = totalHakedisChf - totalTransferChf
+  const totalKalanTry = totalHakedisTry - totalTransferTry
+
+  return (
+    <div className="fade-in">
+      <div style={{
+        background: 'linear-gradient(135deg, #1a1f2e 0%, #2d3548 100%)',
+        color: 'white', borderRadius: 14, padding: '20px 24px', marginBottom: 18,
+        position: 'relative', overflow: 'hidden'
+      }}>
+        <div style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, transparent 70%)' }}/>
+        <div style={{ position: 'relative' }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase', opacity: 0.7, fontWeight: 600, marginBottom: 6 }}>
+            Aylık Hakediş Tablosu
+          </div>
+          <h2 className="display" style={{ fontSize: 22, marginBottom: 4 }}>Ay Bazlı Detaylı Hesap</h2>
+          <p style={{ fontSize: 12, opacity: 0.75 }}>Her ay için hakediş, çekilen, kalan tutar — TL ve CHF bazında</p>
+        </div>
+      </div>
+
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--line)', borderRadius: 12, padding: 14, marginBottom: 18, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 600 }}>Yıl</span>
+          <select value={year} onChange={e => setYear(Number(e.target.value))} style={{ padding: '7px 12px', fontSize: 13, fontWeight: 500 }}>
+            {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        <div style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-muted)' }}>
+          <span style={{ color: 'var(--ink)', fontWeight: 600 }}>{activeMonths.length}</span> aktif ay
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 18 }}>
+        <div style={{ background: 'var(--gradient-1)', color: 'white', borderRadius: 12, padding: '16px 18px', boxShadow: '0 8px 20px rgba(99, 102, 241, 0.25)' }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.9, fontWeight: 600, marginBottom: 6 }}>{year} Toplam Hakediş</div>
+          <div className="mono" style={{ fontSize: 22, fontWeight: 700 }}>{fmtCHF(totalHakedisChf)}</div>
+          <div className="mono" style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>{fmtTL(totalHakedisTry)}</div>
+        </div>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--red)', borderRadius: 12, padding: '16px 18px' }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--red)', fontWeight: 700, marginBottom: 6 }}>{year} Şirketten Çekilen</div>
+          <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: 'var(--red)' }}>{fmtCHF(totalTransferChf)}</div>
+          <div className="mono" style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>{fmtTL(totalTransferTry)}</div>
+        </div>
+        <div style={{ background: 'var(--bg-card)', border: `1px solid ${totalKalanChf >= 0 ? 'var(--green)' : 'var(--red)'}`, borderRadius: 12, padding: '16px 18px' }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: totalKalanChf >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700, marginBottom: 6 }}>{year} Kalan Hakediş</div>
+          <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: totalKalanChf >= 0 ? 'var(--green)' : 'var(--red)' }}>{fmtCHF(totalKalanChf)}</div>
+          <div className="mono" style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>{fmtTL(totalKalanTry)}</div>
+        </div>
+      </div>
+
+      <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 20, border: '1px solid var(--line)', overflowX: 'auto' }}>
+        <h3 className="display" style={{ fontSize: 15, marginBottom: 14 }}>{year} Detay Tablosu</h3>
+        <div style={{ minWidth: 1000 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 1fr 1fr 1fr 1fr 1fr 1fr', gap: 8, padding: '10px 12px', background: 'var(--gradient-1)', color: 'white', borderRadius: 8, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 8 }}>
+            <div>Ay</div>
+            <div style={{ textAlign: 'right' }}>Hakediş CHF</div>
+            <div style={{ textAlign: 'right' }}>Ort. Kur</div>
+            <div style={{ textAlign: 'right' }}>Hakediş TL</div>
+            <div style={{ textAlign: 'right' }}>Çekilen TL</div>
+            <div style={{ textAlign: 'right' }}>Çekilen CHF</div>
+            <div style={{ textAlign: 'right' }}>Kalan TL</div>
+            <div style={{ textAlign: 'right' }}>Kalan CHF</div>
+          </div>
+
+          {activeMonths.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-muted)', fontSize: 13 }}>
+              {year} yılı için kayıtlı hakediş bulunamadı.
+            </div>
+          ) : (
+            activeMonths.map((m, i) => (
+              <div key={m.month} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 1fr 1fr 1fr 1fr 1fr 1fr', gap: 8, padding: '12px 12px', background: i % 2 === 0 ? 'var(--bg-elevated)' : 'transparent', borderRadius: 6, alignItems: 'center', marginBottom: 2 }}>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>
+                  {monthFull(m.month)}
+                  <div style={{ fontSize: 9, color: 'var(--ink-muted)', fontWeight: 400 }}>{year}</div>
+                </div>
+                <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: 'var(--green)', textAlign: 'right' }}>{fmtCHF(m.hakedisChf)}</div>
+                <div className="mono" style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'right' }}>{m.rate.toFixed(4)}</div>
+                <div className="mono" style={{ fontSize: 12, color: 'var(--ink-soft)', textAlign: 'right' }}>{fmtTL(m.hakedisTry)}</div>
+                <div className="mono" style={{ fontSize: 12, color: 'var(--red)', textAlign: 'right' }}>{fmtTL(m.transferTry)}</div>
+                <div className="mono" style={{ fontSize: 12, color: 'var(--red)', textAlign: 'right' }}>{fmtCHF(m.transferChf)}</div>
+                <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: m.kalanTry >= 0 ? 'var(--green)' : 'var(--red)', textAlign: 'right' }}>{fmtTL(m.kalanTry)}</div>
+                <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: m.kalanChf >= 0 ? 'var(--green)' : 'var(--red)', textAlign: 'right' }}>{fmtCHF(m.kalanChf)}</div>
+              </div>
+            ))
+          )}
+
+          {activeMonths.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 1fr 1fr 1fr 1fr 1fr 1fr', gap: 8, padding: '14px 12px', background: 'var(--accent-soft)', border: '2px solid var(--accent)', borderRadius: 8, alignItems: 'center', marginTop: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>TOPLAM</div>
+              <div className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)', textAlign: 'right' }}>{fmtCHF(totalHakedisChf)}</div>
+              <div style={{ textAlign: 'right', fontSize: 10, color: 'var(--ink-muted)' }}>—</div>
+              <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-soft)', textAlign: 'right' }}>{fmtTL(totalHakedisTry)}</div>
+              <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)', textAlign: 'right' }}>{fmtTL(totalTransferTry)}</div>
+              <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)', textAlign: 'right' }}>{fmtCHF(totalTransferChf)}</div>
+              <div className="mono" style={{ fontSize: 13, fontWeight: 700, color: totalKalanTry >= 0 ? 'var(--green)' : 'var(--red)', textAlign: 'right' }}>{fmtTL(totalKalanTry)}</div>
+              <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: totalKalanChf >= 0 ? 'var(--green)' : 'var(--red)', textAlign: 'right' }}>{fmtCHF(totalKalanChf)}</div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: 18, padding: 12, background: 'var(--bg-elevated)', borderRadius: 8, fontSize: 10, color: 'var(--ink-muted)', lineHeight: 1.7 }}>
+          <strong style={{ color: 'var(--ink-soft)' }}>Açıklamalar:</strong><br/>
+          <strong>Hakediş CHF:</strong> O ayın Maaş + French Team Primi toplamı (CHF)<br/>
+          <strong>Ort. Kur:</strong> Tahakkukta kullanılan kur (manuel veya otomatik)<br/>
+          <strong>Çekilen:</strong> O ay şirketten Fatih'e yapılan transferler<br/>
+          <strong>Kalan:</strong> Hakediş − Çekilen (sadece o ay için, birikim yok)
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============= YARDIMCI =============
+
+function ClickableCard({ label, value, subtitle, color, icon, onClick }) {
+  return (
+    <button onClick={onClick} className="card-hover" style={{
+      background: 'var(--bg-card)', border: '1px solid var(--line)',
+      borderRadius: 14, padding: '18px 18px', textAlign: 'left',
+      cursor: 'pointer', transition: 'all 0.2s', position: 'relative', overflow: 'hidden'
+    }}
+    onMouseOver={e => {
+      e.currentTarget.style.transform = 'translateY(-2px)'
+      e.currentTarget.style.boxShadow = '0 8px 20px rgba(99, 102, 241, 0.15)'
+      e.currentTarget.style.borderColor = 'var(--accent)'
+    }}
+    onMouseOut={e => {
+      e.currentTarget.style.transform = 'translateY(0)'
+      e.currentTarget.style.boxShadow = 'none'
+      e.currentTarget.style.borderColor = 'var(--line)'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+        <div style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700 }}>{label}</div>
+        <div style={{ width: 28, height: 28, borderRadius: 8, background: `var(--${color}-soft)`, color: `var(--${color})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={icon} size={14} />
+        </div>
+      </div>
+      <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: `var(--${color})`, marginBottom: 4 }}>{value}</div>
+      <div style={{ fontSize: 10, color: 'var(--ink-muted)' }}>{subtitle}</div>
+      <div style={{ position: 'absolute', bottom: 6, right: 12, fontSize: 9, color: 'var(--ink-faint)', display: 'flex', alignItems: 'center', gap: 3 }}>
+        Detay <Icon name="arrowRight" size={9}/>
+      </div>
+    </button>
+  )
+}
+
+function DetailModal({ modal, onClose, getSafeRate }) {
+  const sorted = [...modal.txs].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  const totalTl = sorted.reduce((s, t) => s + safeNumber(t.amount), 0)
+  const totalChf = sorted.reduce((s, t) => s + (safeNumber(t.amount) / getSafeRate(t.date)), 0)
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(15, 17, 23, 0.6)',
+      backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 100, padding: 20
+    }}>
+      <div onClick={e => e.stopPropagation()} className="fade-in" style={{
+        background: 'var(--bg-card)', borderRadius: 16, padding: 24,
+        width: '100%', maxWidth: 800, maxHeight: '85vh', overflowY: 'auto',
+        boxShadow: 'var(--shadow-lg)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, paddingBottom: 14, borderBottom: '2px solid ' + modal.color }}>
+          <div>
+            <h2 className="display" style={{ fontSize: 20, marginBottom: 4, color: modal.color }}>{modal.title}</h2>
+            <p style={{ fontSize: 12, color: 'var(--ink-muted)' }}>{sorted.length} kayıt</p>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: modal.color }}>{fmtCHF(totalChf)}</div>
+            <div className="mono" style={{ fontSize: 13, color: 'var(--ink-muted)' }}>≈ {fmtTL(totalTl)}</div>
+          </div>
+        </div>
+
+        {sorted.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-muted)', fontSize: 13 }}>Henüz kayıt yok.</div>
+        ) : (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 130px 130px', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--line)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 600 }}>
+              <div>Tarih</div><div>Açıklama</div>
+              <div style={{ textAlign: 'right' }}>CHF</div>
+              <div style={{ textAlign: 'right' }}>TL</div>
+            </div>
+            {sorted.map((tx, i) => {
+              const rate = getSafeRate(tx.date)
+              const amt = safeNumber(tx.amount)
+              const d = safeDate(tx.date)
+              return (
+                <div key={tx.id || i} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 130px 130px', gap: 12, padding: '10px 0', alignItems: 'center', borderBottom: i < sorted.length - 1 ? '1px solid var(--line-soft)' : 'none' }}>
+                  <div className="mono" style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{d ? d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</div>
+                  <div style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.description || '—'}</div>
+                  <div className="mono" style={{ fontSize: 12, textAlign: 'right', color: 'var(--ink-muted)' }}>{fmtCHF(amt / rate)}</div>
+                  <div className="mono" style={{ fontSize: 13, fontWeight: 600, textAlign: 'right', color: modal.color }}>{fmtTL(amt)}</div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <div style={{ marginTop: 20, paddingTop: 14, borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '8px 18px', borderRadius: 8, background: 'var(--bg-input)', border: '1px solid var(--line)', fontSize: 12, fontWeight: 600 }}>Kapat</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Row({ label, chf, tl, sign, color, bold = false }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px', gap: 12, fontWeight: bold ? 700 : 400 }}>
+      <div style={{ color }}>{label}</div>
+      <div style={{ textAlign: 'right', color }}>{sign} {fmtCHF(Math.abs(safeNumber(chf)))}</div>
+      <div style={{ textAlign: 'right', color, opacity: 0.7 }}>{sign} {fmtTL(Math.abs(safeNumber(tl)))}</div>
+    </div>
+  )
+}

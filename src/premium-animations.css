@@ -1,0 +1,557 @@
+/* ═══════════════════════════════════════════════════
+   CXENTRIX PREMIUM ANIMATIONS
+   Premium/Lux tarzı animasyonlar ve efektler
+   Mevcut stillerin üzerine eklenir, hiçbir şeyi bozmaz
+   ═══════════════════════════════════════════════════ */
+
+/* ─── 1. SAYFA GEÇİŞLERİ ─── */
+@keyframes premiumFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes premiumFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes premiumScale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.18),
+                0 0 0 0 rgba(99, 102, 241, 0);
+  }
+  50% {
+    box-shadow: 0 12px 32px rgba(99, 102, 241, 0.28),
+                0 0 0 8px rgba(99, 102, 241, 0.04);
+  }
+}
+
+@keyframes softGlow {
+  0%, 100% {
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.12);
+  }
+  50% {
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.20);
+  }
+}
+
+@keyframes shineSlide {
+  0% { transform: translateX(-100%) skewX(-15deg); }
+  100% { transform: translateX(200%) skewX(-15deg); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Sayfa container'ı için yumuşak giriş */
+.fade-in {
+  animation: premiumFadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+main .fade-in > * {
+  animation: premiumFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+main .fade-in > *:nth-child(1) { animation-delay: 0.05s; }
+main .fade-in > *:nth-child(2) { animation-delay: 0.12s; }
+main .fade-in > *:nth-child(3) { animation-delay: 0.19s; }
+main .fade-in > *:nth-child(4) { animation-delay: 0.26s; }
+main .fade-in > *:nth-child(5) { animation-delay: 0.33s; }
+
+/* ─── 2. KPI KARTLARI - PREMIUM HOVER ─── */
+
+/* Gradient KPI kartları için breathing effect */
+[style*="var(--gradient-1)"]:not(button):not(input):not(.spinner) {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Tüm kart benzeri elementlere subtle hover */
+[style*="var(--bg-card)"] {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease;
+}
+
+/* Card-hover class'ı için lift + glow */
+.card-hover {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important,
+              box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important,
+              border-color 0.2s ease !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-hover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg,
+    transparent 0%,
+    rgba(99, 102, 241, 0.08) 50%,
+    transparent 100%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.card-hover:hover::before {
+  opacity: 1;
+}
+
+.card-hover:hover {
+  transform: translateY(-3px) !important;
+  box-shadow:
+    0 12px 28px rgba(99, 102, 241, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Glow card'lar için soft pulse */
+.glow-card {
+  animation: glowPulse 4s ease-in-out infinite;
+}
+
+/* ─── 3. BUTONLAR - PREMIUM ─── */
+
+button {
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.25s ease,
+              background-color 0.2s ease,
+              color 0.2s ease !important;
+  overflow: hidden;
+}
+
+button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+button:not(:disabled):active {
+  transform: translateY(0px) scale(0.98);
+  transition-duration: 0.1s;
+}
+
+/* Gradient (primary) butonlar için shimmer */
+button[style*="var(--gradient-1)"]:not(:disabled) {
+  position: relative;
+  overflow: hidden;
+}
+
+button[style*="var(--gradient-1)"]:not(:disabled)::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transition: left 0.6s ease;
+  pointer-events: none;
+}
+
+button[style*="var(--gradient-1)"]:not(:disabled):hover::after {
+  left: 200%;
+}
+
+button[style*="var(--gradient-1)"]:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.35) !important;
+}
+
+/* ─── 4. SIDEBAR - PREMIUM ─── */
+
+aside button.nav-item,
+aside .nav-item {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+aside button.nav-item::before,
+aside .nav-item::before {
+  content: '';
+  position: absolute;
+  left: -100%;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--gradient-1);
+  border-radius: 0 2px 2px 0;
+  transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+aside button.nav-item:hover::before,
+aside .nav-item:hover::before {
+  left: 0;
+}
+
+aside button.nav-item:hover,
+aside .nav-item:hover {
+  background: var(--accent-soft) !important;
+  transform: translateX(2px);
+}
+
+aside button.nav-item[style*="var(--accent-soft)"]::before {
+  left: 0;
+}
+
+/* ─── 5. MODAL - PREMIUM ─── */
+
+/* Modal backdrop - daha derin blur */
+div[style*="position: fixed"][style*="inset: 0"][style*="rgba(15, 17, 23"] {
+  animation: premiumFadeIn 0.25s ease-out;
+  backdrop-filter: blur(8px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(180%) !important;
+}
+
+/* Modal content - smooth scale in */
+div[style*="position: fixed"][style*="inset: 0"][style*="rgba(15, 17, 23"] > div {
+  animation: premiumScale 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(99, 102, 241, 0.08) !important;
+}
+
+/* ─── 6. TABLO SATIRLARI ─── */
+
+/* Tablo benzeri grid satırları için */
+div[style*="grid-template-columns"]:not([style*="repeat"]) {
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+/* ─── 7. INPUT'LAR - PREMIUM ─── */
+
+input, select, textarea {
+  transition: border-color 0.2s ease,
+              box-shadow 0.25s ease,
+              background-color 0.2s ease !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15),
+              0 2px 8px rgba(99, 102, 241, 0.08) !important;
+  border-color: var(--accent) !important;
+}
+
+input:hover:not(:focus):not(:disabled),
+select:hover:not(:focus):not(:disabled) {
+  border-color: var(--accent) !important;
+}
+
+/* ─── 8. GRADIENT TEXT - SHIMMER ─── */
+
+.gradient-text {
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    var(--purple, #8b5cf6) 25%,
+    var(--accent) 50%,
+    var(--purple, #8b5cf6) 75%,
+    var(--accent) 100%
+  ) !important;
+  background-size: 200% auto !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+  animation: shimmer 6s linear infinite;
+}
+
+/* ─── 9. SPINNER - PREMIUM ─── */
+
+.spinner {
+  animation: spin 0.8s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite !important;
+  position: relative;
+}
+
+.spinner::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+  animation: glowPulse 1.5s ease-in-out infinite;
+  z-index: -1;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── 10. LINK / BUTON GENİŞ HOVER GLOW ─── */
+
+/* Login butonu, Yeni İşlem butonu gibi büyük CTA'lar */
+button[style*="0 4px 12px rgba(99, 102, 241"]:not(:disabled),
+button[style*="0 8px 20px rgba(99, 102, 241"]:not(:disabled) {
+  position: relative;
+}
+
+button[style*="0 4px 12px rgba(99, 102, 241"]:not(:disabled):hover {
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4) !important;
+}
+
+button[style*="0 8px 20px rgba(99, 102, 241"]:not(:disabled):hover {
+  box-shadow: 0 12px 32px rgba(99, 102, 241, 0.4) !important;
+}
+
+/* ─── 11. HEADER - PREMIUM ENTRANCE ─── */
+
+main > div:first-child {
+  animation: premiumFadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* H1 başlıkları için subtle reveal */
+h1.display,
+h2.display,
+h3.display {
+  animation: premiumFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* ─── 12. ICONS - SUBTLE WIGGLE ON HOVER ─── */
+
+button:hover svg,
+button:hover .icon {
+  animation: iconBounce 0.4s ease;
+}
+
+@keyframes iconBounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+/* ─── 13. PROGRESS BAR (HORIZONTAL BAR) - ANIMATED FILL ─── */
+
+div[style*="background: var(--gradient-1)"][style*="height: 100%"],
+div[style*="background: var(--accent)"][style*="height: 100%"] {
+  animation: barFillIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  transform-origin: left center;
+  position: relative;
+  overflow: hidden;
+}
+
+div[style*="background: var(--gradient-1)"][style*="height: 100%"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: shimmer 3s linear infinite;
+}
+
+@keyframes barFillIn {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* ─── 14. CURRENCY TICKER - SUBTLE PARALLAX ─── */
+
+/* Ticker daha yumuşak ve premium kayma */
+[class*="ticker"] {
+  position: relative;
+}
+
+[class*="ticker"]::before,
+[class*="ticker"]::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 80px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+[class*="ticker"]::before {
+  left: 0;
+  background: linear-gradient(90deg, var(--bg, white) 0%, transparent 100%);
+}
+
+[class*="ticker"]::after {
+  right: 0;
+  background: linear-gradient(-90deg, var(--bg, white) 0%, transparent 100%);
+}
+
+/* ─── 15. SCROLLBAR - PREMIUM ─── */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-elevated, transparent);
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--accent), var(--purple, #8b5cf6));
+  border-radius: 8px;
+  border: 2px solid var(--bg-elevated, transparent);
+  background-clip: padding-box;
+  transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--purple, #8b5cf6), var(--accent));
+  background-clip: padding-box;
+}
+
+/* ─── 16. SELECTION (METİN SEÇİMİ) ─── */
+
+::selection {
+  background: var(--accent);
+  color: white;
+}
+
+::-moz-selection {
+  background: var(--accent);
+  color: white;
+}
+
+/* ─── 17. DASHBOARD KPI - SAYI VURGUSU ─── */
+
+/* Mono font ile yazılmış büyük sayılar için subtle hover */
+.mono {
+  transition: color 0.3s ease, transform 0.3s ease;
+}
+
+/* ─── 18. SIDEBAR LOGO - DAHA RAFİNE ─── */
+
+aside img[alt="Cxentrix"] {
+  animation: float 4s ease-in-out infinite;
+  transition: filter 0.3s, transform 0.3s !important;
+}
+
+aside img[alt="Cxentrix"]:hover {
+  transform: scale(1.1) rotate(-3deg);
+}
+
+/* ─── 19. DARK THEME - EXTRA GLOW ─── */
+
+[data-theme="dark"] button[style*="var(--gradient-1)"]:not(:disabled):hover {
+  box-shadow:
+    0 8px 24px rgba(99, 102, 241, 0.5),
+    0 0 30px rgba(99, 102, 241, 0.2) !important;
+}
+
+[data-theme="dark"] [style*="var(--bg-card)"]:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+[data-theme="dark"] ::selection {
+  background: var(--accent);
+  color: white;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+}
+
+/* ─── 20. TAB SWITCHER GLOW ─── */
+
+/* Tab switcher (yıllık/aylık, cari hesap/hakediş, vs.) için */
+div[style*="position: relative"] > div[style*="background: var(--gradient-1)"][style*="position: absolute"] {
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.4),
+              0 0 20px rgba(99, 102, 241, 0.2) !important;
+}
+
+/* ─── 21. NUMBER TICKER (sayfa açılırken sayı saymak için) ─── */
+/* JSX'te ek class gerekiyor ama hazır olsun */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.number-ticker {
+  display: inline-block;
+  animation: countUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─── 22. GLASSMORPHISM - HEADER BAR ─── */
+
+/* Sticky header'lar için cam görünümü */
+div[style*="position: sticky"],
+div[style*="position: fixed"][style*="top"] {
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+}
+
+/* ─── 23. CHARTS - SMOOTH APPEAR ─── */
+
+canvas {
+  animation: premiumFadeIn 0.7s ease-out;
+}
+
+/* ─── 24. LOGİN PAGE - EXTRA PREMIUM ─── */
+
+/* Login formu - daha şık entrance */
+body > #root > div[style*="minHeight: '100vh'"][style*="display: 'flex'"][style*="alignItems: 'center'"] {
+  position: relative;
+  overflow: hidden;
+}
+
+body > #root > div[style*="minHeight: '100vh'"][style*="display: 'flex'"][style*="alignItems: 'center'"]::before {
+  content: '';
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+  top: -200px;
+  right: -200px;
+  animation: float 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+body > #root > div[style*="minHeight: '100vh'"][style*="display: 'flex'"][style*="alignItems: 'center'"]::after {
+  content: '';
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, transparent 70%);
+  border-radius: 50%;
+  bottom: -150px;
+  left: -150px;
+  animation: float 8s ease-in-out infinite reverse;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════
+   END OF PREMIUM ANIMATIONS
+   ═══════════════════════════════════════════════════ */
