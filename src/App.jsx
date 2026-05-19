@@ -112,10 +112,11 @@ function AppInner() {
       <CurrencyTicker />
       <div style={{ display: 'flex', flex: 1 }}>
         <Sidebar mode={mode} view={view} setView={setView} onAdd={() => setShowAdd(true)} theme={theme} toggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')} user={session.user} onSignOut={handleSignOut} />
-user={session?.user || { email: 'admin@cxentrix.com' }}          <Header view={view} mode={mode} setMode={setMode} />
+<div style={{ display: 'flex', flex: 1 }}>
+        <Sidebar mode={mode} view={view} setView={setView} onAdd={() => setShowAdd(true)} theme={theme} toggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')} user={session?.user || { email: 'admin@cxentrix.com' }} onSignOut={handleSignOut} />
+        <main style={{ flex: 1, padding: '20px 36px 28px', maxWidth: 1600, width: '100%' }}>
+          <Header view={view} mode={mode} setMode={setMode} />
           <div className="fade-in">
-            {mode === 'logic' && <LogicView data={data} />}
-            {mode === 'cxentrix' && view === 'dashboard' && <Dashboard data={data} setView={setView} />}
             {mode === 'cxentrix' && view === 'transactions' && <Transactions data={data} reload={loadAllData} />}
             {mode === 'cxentrix' && view === 'installments' && <Installments data={data} />}
             {mode === 'cxentrix' && view === 'reports' && <Reports data={data} />}
