@@ -64,9 +64,9 @@ function AppInner() {
   }, [])
 
   useEffect(() => {
-    if (!session) return
+    // Login kaldırıldı - direkt data yükle
     loadAllData()
-  }, [session])
+  }, [])
 
   const loadAllData = async () => {
     setLoading(true)
@@ -97,8 +97,8 @@ function AppInner() {
     </div>
   }
 
-  if (!session) return <Login />
-
+// Login kaldırıldı - direkt giriş
+  // if (!session) return <Login />
   if (loading) {
     return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div style={{ textAlign: 'center' }}>
@@ -113,8 +113,7 @@ function AppInner() {
       <CurrencyTicker />
       <div style={{ display: 'flex', flex: 1 }}>
         <Sidebar mode={mode} view={view} setView={setView} onAdd={() => setShowAdd(true)} theme={theme} toggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')} user={session.user} onSignOut={handleSignOut} />
-        <main style={{ flex: 1, padding: '20px 36px 28px', maxWidth: 1600, width: '100%' }}>
-          <Header view={view} mode={mode} setMode={setMode} />
+user={session?.user || { email: 'admin@cxentrix.com' }}          <Header view={view} mode={mode} setMode={setMode} />
           <div className="fade-in">
             {mode === 'logic' && <LogicView data={data} />}
             {mode === 'cxentrix' && view === 'dashboard' && <Dashboard data={data} setView={setView} />}
