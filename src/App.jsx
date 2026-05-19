@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import Login from './Login'
 import Dashboard from './views/Dashboard'
 import Transactions from './views/Transactions'
 import Reports from './views/Reports'
@@ -27,8 +26,6 @@ export default function App() {
 }
 
 function AppInner() {
-  const [session, setSession] = useState(null)
-  const [authLoading, setAuthLoading] = useState(true)
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('cxentrix-theme') || 'light' } catch { return 'light' }
   })
@@ -53,18 +50,6 @@ function AppInner() {
   }, [mode])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setAuthLoading(false)
-    })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
-    return () => subscription.unsubscribe()
-  }, [])
-
-  useEffect(() => {
-    // Login kaldırıldı - direkt data yükle
     loadAllData()
   }, [])
 
@@ -86,18 +71,6 @@ function AppInner() {
     }
   }
 
-  const handleSignOut = async () => {
-    if (!confirm('Çıkış yapmak istediğine emin misin?')) return
-    await supabase.auth.signOut()
-  }
-
-  if (authLoading) {
-    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-      <div className="spinner" style={{ width: 40, height: 40, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%' }}></div>
-    </div>
-  }
-
-  // Login kaldırıldı - eski kontrol kapalı
   if (loading) {
     return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div style={{ textAlign: 'center' }}>
@@ -111,12 +84,12 @@ function AppInner() {
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <CurrencyTicker />
       <div style={{ display: 'flex', flex: 1 }}>
-        <Sidebar mode={mode} view={view} setView={setView} onAdd={() => setShowAdd(true)} theme={theme} toggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')} user={session.user} onSignOut={handleSignOut} />
-<div style={{ display: 'flex', flex: 1 }}>
-        <Sidebar mode={mode} view={view} setView={setView} onAdd={() => setShowAdd(true)} theme={theme} toggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')} user={session?.user || { email: 'admin@cxentrix.com' }} onSignOut={handleSignOut} />
+        <Sidebar mode={mode} view={view} setView={setView} onAdd={() => setShowAdd(true)} theme={theme} toggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')} user={{ email: 'admin@cxentrix.com' }} />
         <main style={{ flex: 1, padding: '20px 36px 28px', maxWidth: 1600, width: '100%' }}>
           <Header view={view} mode={mode} setMode={setMode} />
           <div className="fade-in">
+            {mode === 'logic' && <LogicView data={data} />}
+            {mode === 'cxentrix' && view === 'dashboard' && <Dashboard data={data} setView={setView} />}
             {mode === 'cxentrix' && view === 'transactions' && <Transactions data={data} reload={loadAllData} />}
             {mode === 'cxentrix' && view === 'installments' && <Installments data={data} />}
             {mode === 'cxentrix' && view === 'reports' && <Reports data={data} />}
@@ -134,7 +107,7 @@ function AppInner() {
   )
 }
 
-function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onSignOut }) {
+function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user }) {
   const cxentrixItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', section: 'main' },
     { id: 'transactions', label: 'İşlemler', icon: 'list', section: 'main' },
@@ -157,7 +130,6 @@ function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onSignO
     ? { logic: 'Logic Holding Görünümü' }
     : { main: 'Ana', reports: 'Raporlar', people: 'Kişiler', system: 'Sistem' }
 
-  // Logo beyaza dönüşüm (koyu temada)
   const logoFilter = theme === 'dark'
     ? 'brightness(0) invert(1) drop-shadow(0 0 8px rgba(99, 102, 241, 0.6))'
     : 'drop-shadow(0 2px 6px rgba(99, 102, 241, 0.25))'
@@ -251,9 +223,6 @@ function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onSignO
         </div>
         <button onClick={toggleTheme} style={{ width: '100%', padding: '6px 10px', borderRadius: 7, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-muted)', marginBottom: 3 }}>
           <Icon name={theme === 'light' ? 'moon' : 'sun'} size={12} />{theme === 'light' ? 'Koyu Tema' : 'Açık Tema'}
-        </button>
-        <button onClick={onSignOut} style={{ width: '100%', padding: '6px 10px', borderRadius: 7, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--red)' }}>
-          <Icon name="logout" size={12} />Çıkış Yap
         </button>
       </div>
 
