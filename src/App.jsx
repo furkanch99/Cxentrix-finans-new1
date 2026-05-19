@@ -97,8 +97,7 @@ function AppInner() {
     </div>
   }
 
-// Login kaldırıldı - direkt giriş
-  // if (!session) return <Login />
+  // Login kaldırıldı - eski kontrol kapalı
   if (loading) {
     return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div style={{ textAlign: 'center' }}>
