@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { Icon, fmtTL, monthName, monthFull } from '../utils'
 import { useCurrency, fmtCHF } from '../CurrencyContext'
 import { fetchFatihSettings, fetchFatihSalaries, accrueFatihSalary, deleteFatihSalary, getRateForDate } from '../dataService'
+import { isFatihTransferTx } from '../fatihHelper'
 
 const safeNumber = (v, def = 0) => {
   const n = parseFloat(v)
@@ -83,10 +84,14 @@ export default function FatihAccount({ data, reload }) {
       })
 
       // Şirket'ten Fatih'e transfer
+      // Maaş ve prim aynı kategoride saklandığı için (Fatih Karakaş)
+      // sadece açıklamasında "maaş/aylık/primi" geçmeyenler — yani gerçek
+      // para transferleri — burada sayılır. Maaşlar zaten salaries
+      // tablosundan ayrıca hesaplanıyor; çift sayıma engel olur.
       const transferTxs = allTxs.filter(t => {
         if (!t || t.type !== 'expense') return false
         if (!t.date || t.date < startDate) return false
-        return String(t.category || '').toLowerCase().includes('fatih karaka')
+        return isFatihTransferTx(t)
       })
 
       // TL toplamı (kategoride amount TL olarak saklanır)
