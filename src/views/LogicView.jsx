@@ -4,6 +4,7 @@ import { Icon, fmtTL, monthName, monthFull, getChartTheme } from '../utils'
 import { useCurrency, fmtCHF, FALLBACK_RATE } from '../CurrencyContext'
 import { isFatihTransferTx } from '../fatihHelper'
 import { useToast } from '../Toast'
+import CategoryTrend from './CategoryTrend'
 
 export default function LogicView({ data }) {
   const toast = useToast()
@@ -194,35 +195,27 @@ export default function LogicView({ data }) {
           </select>
         </div>
 
-        <div style={{ display: 'flex', background: 'var(--bg-card)', border: '1px solid var(--line)', borderRadius: 10, padding: 4, boxShadow: 'var(--shadow-sm)', position: 'relative' }}>
-          <div style={{
-            position: 'absolute', top: 4, bottom: 4,
-            left: view === 'yearly' ? 4 : '50%',
-            width: 'calc(50% - 4px)',
-            background: 'var(--gradient-1)', borderRadius: 7,
-            transition: 'left 0.25s ease',
-            boxShadow: '0 2px 8px rgba(99, 102, 241, 0.3)', zIndex: 0
-          }}/>
-          <button onClick={() => setView('yearly')} style={{
-            padding: '9px 20px', borderRadius: 7, fontSize: 12, fontWeight: 600,
-            color: view === 'yearly' ? 'white' : 'var(--ink-muted)',
-            background: 'transparent', position: 'relative', zIndex: 1,
-            display: 'flex', alignItems: 'center', gap: 6, border: 'none', cursor: 'pointer'
-          }}>
-            <Icon name="chart" size={13} /> Yıllık Rapor
-          </button>
-          <button onClick={() => setView('monthly')} style={{
-            padding: '9px 20px', borderRadius: 7, fontSize: 12, fontWeight: 600,
-            color: view === 'monthly' ? 'white' : 'var(--ink-muted)',
-            background: 'transparent', position: 'relative', zIndex: 1,
-            display: 'flex', alignItems: 'center', gap: 6, border: 'none', cursor: 'pointer'
-          }}>
-            <Icon name="pie" size={13} /> Aylık Rapor
-          </button>
+        <div style={{ display: 'flex', background: 'var(--bg-card)', border: '1px solid var(--line)', borderRadius: 10, padding: 4, boxShadow: 'var(--shadow-sm)' }}>
+          {[
+            { key: 'yearly',  label: 'Yıllık Rapor',   icon: 'chart' },
+            { key: 'monthly', label: 'Aylık Rapor',    icon: 'pie' },
+            { key: 'trend',   label: 'Kategori Trendi', icon: 'trending' },
+          ].map(t => (
+            <button key={t.key} onClick={() => setView(t.key)} style={{
+              padding: '9px 18px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+              color: view === t.key ? 'white' : 'var(--ink-muted)',
+              background: view === t.key ? 'var(--gradient-1)' : 'transparent',
+              boxShadow: view === t.key ? '0 2px 8px rgba(99, 102, 241, 0.3)' : 'none',
+              transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 6,
+              border: 'none', cursor: 'pointer'
+            }}>
+              <Icon name={t.icon} size={13} /> {t.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {view === 'yearly' ? (
+      {view === 'yearly' && (
         <YearlyView
           year={year}
           monthlySummary={monthlySummary}
@@ -237,7 +230,8 @@ export default function LogicView({ data }) {
           expandedCategory={expandedCategory}
           setExpandedCategory={setExpandedCategory}
         />
-      ) : (
+      )}
+      {view === 'monthly' && (
         <MonthlyView
           year={year}
           selectedMonth={selectedMonth}
@@ -245,6 +239,19 @@ export default function LogicView({ data }) {
           currentMonth={currentMonth}
           monthlySummary={monthlySummary}
         />
+      )}
+      {view === 'trend' && (
+        <div className="fade-in">
+          <div style={{
+            background: 'var(--accent-soft)', border: '1px solid var(--accent)',
+            borderRadius: 10, padding: '10px 14px', marginBottom: 14,
+            fontSize: 11, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 8
+          }}>
+            <Icon name="trending" size={13} />
+            <span>Logic kapsamında Cxentrix maliyet kategorilerinin ay bazlı karşılaştırması. Fatih Karakaş cari hareketleri dahil değildir.</span>
+          </div>
+          <CategoryTrend data={data} />
+        </div>
       )}
     </div>
   )
