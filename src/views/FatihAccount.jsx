@@ -75,7 +75,7 @@ export default function FatihAccount({ data, reload }) {
         return String(t.category || '').toLowerCase().includes('french team')
       })
 
-      // Fatih'in şirkete avans verdiği işlemler
+      // Fatih'in cebinden ödediği şirket harcamaları (Şirket İçi Harcamalar)
       const advanceTxs = allTxs.filter(t => {
         if (!t || t.type !== 'expense') return false
         if (!t.date || t.date < startDate) return false
@@ -107,7 +107,7 @@ export default function FatihAccount({ data, reload }) {
       const salaryChfTotal = (salaries || []).reduce((s, sal) => s + safeNumber(sal.amount_chf), 0)
       const salaryTryTotal = (salaries || []).reduce((s, sal) => s + safeNumber(sal.amount_try), 0)
 
-      // French Team Primi, Fatih→Şirket avans, Şirket→Fatih transfer
+      // French Team Primi, Şirket İçi Harcamalar, Şirket→Fatih transfer
       const frenchTryTotal   = sumTry(frenchTxs)
       const frenchChfTotal   = sumChf(frenchTxs)
       const advanceTryTotal  = sumTry(advanceTxs)
@@ -130,7 +130,7 @@ export default function FatihAccount({ data, reload }) {
       //   + Açılış bakiyesi
       //   + Tahakkuk eden maaşlar
       //   + French Team primleri
-      //   + Fatih'in cebinden ödediği işler (avans)
+      //   + Şirket içi harcamalar (Fatih'in cebinden)
       //   - Şirketten Fatih'e yapılan transferler
       const totalChf = openingBalanceChf + salaryChfTotal + frenchChfTotal + advanceChfTotal - transferChfTotal
       const totalTry = openingBalanceTry + salaryTryTotal + frenchTryTotal + advanceTryTotal - transferTryTotal
@@ -317,7 +317,7 @@ function SummaryView({ fatihData, settings, salaries, onAddSalary, handleDeleteS
         <ClickableCard label="Toplam Maaş" value={fmtCHF(fatihData.salaryChf)} subtitle={`${fatihData.salaryTxs.length} ay · ${fmtTL(fatihData.salaryTry)}`} color="green" icon="users" onClick={() => setDetailModal({ type: 'salary', title: 'Maaş Tahakkukları', txs: fatihData.salaryTxs, color: 'var(--green)' })} />
         <ClickableCard label="French Team Primi" value={fmtCHF(fatihData.frenchChf)} subtitle={`${fatihData.frenchTxs.length} kayıt · ${fmtTL(fatihData.frenchTry)}`} color="blue" icon="spark" onClick={() => setDetailModal({ type: 'french', title: 'French Team Primi', txs: fatihData.frenchTxs, color: 'var(--blue)' })} />
         <ClickableCard label="Şirket → Fatih Transfer" value={fmtCHF(fatihData.transferChf)} subtitle={`${fatihData.transferTxs.length} işlem · ${fmtTL(fatihData.transferTry)}`} color="red" icon="arrowDown" onClick={() => setDetailModal({ type: 'transfer', title: 'Şirket → Fatih Transferleri', txs: fatihData.transferTxs, color: 'var(--red)' })} />
-        <ClickableCard label="Fatih → Şirket Avans" value={fmtCHF(fatihData.advanceChf)} subtitle={`${fatihData.advanceTxs.length} işlem · ${fmtTL(fatihData.advanceTry)}`} color="amber" icon="arrowUp" onClick={() => setDetailModal({ type: 'advance', title: 'Fatih → Şirket Avansları', txs: fatihData.advanceTxs, color: 'var(--amber)' })} />
+        <ClickableCard label="Şirket İçi Harcamalar" value={fmtCHF(fatihData.advanceChf)} subtitle={`${fatihData.advanceTxs.length} işlem · ${fmtTL(fatihData.advanceTry)}`} color="amber" icon="arrowUp" onClick={() => setDetailModal({ type: 'advance', title: 'Şirket İçi Harcamalar', txs: fatihData.advanceTxs, color: 'var(--amber)' })} />
       </div>
 
       {/* Donut + Bakiye Hesabı yan yana */}
@@ -333,7 +333,7 @@ function SummaryView({ fatihData, settings, salaries, onAddSalary, handleDeleteS
             <Row label="Başlangıç Bakiyesi" chf={fatihData.openingBalanceChf} tl={fatihData.openingBalanceTry} sign="" color="var(--ink-soft)" />
             <Row label="+ Maaş Tahakkukları" chf={fatihData.salaryChf} tl={fatihData.salaryTry} sign="+" color="var(--green)" />
             <Row label="+ French Team Primleri" chf={fatihData.frenchChf} tl={fatihData.frenchTry} sign="+" color="var(--blue)" />
-            <Row label="+ Fatih → Şirket Avansları" chf={fatihData.advanceChf} tl={fatihData.advanceTry} sign="+" color="var(--amber)" />
+            <Row label="+ Şirket İçi Harcamalar" chf={fatihData.advanceChf} tl={fatihData.advanceTry} sign="+" color="var(--amber)" />
             <Row label="− Şirket → Fatih Transferleri" chf={fatihData.transferChf} tl={fatihData.transferTry} sign="−" color="var(--red)" />
             <div style={{ borderTop: '2px solid var(--accent)', marginTop: 8, paddingTop: 12 }}>
               <Row label="MEVCUT BAKİYE" chf={fatihData.balanceChf} tl={fatihData.balanceTry} sign="" color={isPositive ? 'var(--green)' : isNegative ? 'var(--red)' : 'var(--ink)'} bold />
@@ -345,7 +345,7 @@ function SummaryView({ fatihData, settings, salaries, onAddSalary, handleDeleteS
       {/* Son hareketler timeline */}
       <RecentActivityPanel fatihData={fatihData} />
 
-      {/* Sekmeli detay paneli: Maaş / Prim / Transfer / Avans */}
+      {/* Sekmeli detay paneli: Maaş / Prim / Transfer / Şirket İçi Harcamalar */}
       <GroupedDetailPanel
         fatihData={fatihData}
         salaries={salaries}
@@ -361,7 +361,7 @@ function BalanceDonut({ data }) {
     { n: 'Açılış Bakiyesi', a: Math.max(0, safeNumber(data.openingBalanceTry)) },
     { n: 'Maaş Tahakkukları', a: Math.max(0, safeNumber(data.salaryTry)) },
     { n: 'French Team Primi', a: Math.max(0, safeNumber(data.frenchTry)) },
-    { n: 'Fatih → Şirket Avans', a: Math.max(0, safeNumber(data.advanceTry)) },
+    { n: 'Şirket İçi Harcamalar', a: Math.max(0, safeNumber(data.advanceTry)) },
   ].filter(s => s.a > 0)
 
   const total = slices.reduce((s, x) => s + x.a, 0)
@@ -411,7 +411,7 @@ function RecentActivityPanel({ fatihData }) {
       all.push({
         kind: 'advance', date: t.date,
         amount_try: safeNumber(t.amount), amount_chf: safeNumber(t.amount) / 54,
-        label: t.description ? `Avans: ${t.description}` : `Avans (${t.category})`,
+        label: t.description ? `Şirket içi harcama: ${t.description}` : `Şirket içi harcama (${t.category})`,
         sign: '+', color: 'var(--amber)', icon: 'arrowUp',
       })
     })
@@ -465,7 +465,7 @@ function GroupedDetailPanel({ fatihData, salaries, handleDeleteSalary }) {
     { key: 'salary',   label: 'Maaşlar',     count: salaries.length, color: 'var(--green)' },
     { key: 'french',   label: 'Primler',     count: fatihData.frenchTxs.length, color: 'var(--blue)' },
     { key: 'transfer', label: 'Transferler', count: fatihData.transferTxs.length, color: 'var(--red)' },
-    { key: 'advance',  label: 'Avanslar',    count: fatihData.advanceTxs.length, color: 'var(--amber)' },
+    { key: 'advance',  label: 'Şirket İçi Harcamalar', count: fatihData.advanceTxs.length, color: 'var(--amber)' },
   ]
 
   return (
@@ -519,7 +519,7 @@ function GroupedDetailPanel({ fatihData, salaries, handleDeleteSalary }) {
       )}
       {tab === 'advance' && (
         fatihData.advanceTxs.length === 0
-          ? <EmptyState text="Henüz Fatih → Şirket avansı yok."/>
+          ? <EmptyState text="Henüz şirket içi harcama yok."/>
           : <TxTable txs={fatihData.advanceTxs} color="var(--amber)" />
       )}
     </div>
