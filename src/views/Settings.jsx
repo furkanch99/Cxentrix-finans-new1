@@ -5,6 +5,7 @@ import {
   upsertExchangeRate, fetchTCMBRate, fetchFatihSettings, updateFatihSettings
 } from '../dataService'
 import { useCurrency, fmtCHF } from '../CurrencyContext'
+import { useToast } from '../Toast'
 
 export default function Settings({ data, reload }) {
   const [tab, setTab] = useState('categories')
@@ -25,6 +26,7 @@ export default function Settings({ data, reload }) {
 }
 
 function CategoriesSettings({ data, reload }) {
+  const toast = useToast()
   const [name, setName] = useState('')
   const [type, setType] = useState('expense')
   const add = async () => {
@@ -33,14 +35,16 @@ function CategoriesSettings({ data, reload }) {
       await addCategory(name.trim(), type)
       setName('')
       await reload()
-    } catch (err) { alert('Hata: ' + err.message) }
+      toast.success(`Kategori eklendi: ${name.trim()}`)
+    } catch (err) { toast.error('Hata: ' + err.message) }
   }
   const del = async (id) => {
     if (!confirm('Bu kategoriyi silmek istediğine emin misin?')) return
     try {
       await deleteCategory(id)
       await reload()
-    } catch (err) { alert('Hata: ' + err.message) }
+      toast.success('Kategori silindi')
+    } catch (err) { toast.error('Hata: ' + err.message) }
   }
   return (
     <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 22, border: '1px solid var(--line)' }}>
@@ -69,6 +73,7 @@ function CategoriesSettings({ data, reload }) {
 }
 
 function PaymentsSettings({ data, reload }) {
+  const toast = useToast()
   const [name, setName] = useState('')
   const add = async () => {
     if (!name.trim()) return
@@ -76,14 +81,16 @@ function PaymentsSettings({ data, reload }) {
       await addPaymentType(name.trim())
       setName('')
       await reload()
-    } catch (err) { alert('Hata: ' + err.message) }
+      toast.success(`Ödeme türü eklendi: ${name.trim()}`)
+    } catch (err) { toast.error('Hata: ' + err.message) }
   }
   const del = async (p) => {
     if (!confirm('Bu ödeme türünü silmek istediğine emin misin?')) return
     try {
       await deletePaymentType(p)
       await reload()
-    } catch (err) { alert('Hata: ' + err.message) }
+      toast.success('Ödeme türü silindi')
+    } catch (err) { toast.error('Hata: ' + err.message) }
   }
   return (
     <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 22, border: '1px solid var(--line)' }}>
@@ -102,6 +109,7 @@ function PaymentsSettings({ data, reload }) {
 }
 
 function RatesSettings() {
+  const toast = useToast()
   const { rates, latestRate, manualUpdate, autoUpdateRate, reload } = useCurrency()
   const [date, setDate] = useState(todayStr())
   const [rate, setRate] = useState('')
@@ -114,8 +122,9 @@ function RatesSettings() {
     try {
       await manualUpdate(date, parseFloat(rate))
       setRate('')
+      toast.success('Kur kaydedildi')
     } catch (err) {
-      alert('Hata: ' + err.message)
+      toast.error('Hata: ' + err.message)
     } finally {
       setUpdating(false)
     }
@@ -125,8 +134,9 @@ function RatesSettings() {
     setAutoLoading(true)
     try {
       await autoUpdateRate()
+      toast.success('Güncel kur çekildi')
     } catch (err) {
-      alert('Otomatik güncelleme başarısız: ' + err.message)
+      toast.error('Otomatik güncelleme başarısız: ' + err.message)
     } finally {
       setAutoLoading(false)
     }
@@ -197,6 +207,7 @@ function RatesSettings() {
 }
 
 function FatihSettings() {
+  const toast = useToast()
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -236,9 +247,9 @@ function FatihSettings() {
         monthly_salary_chf: parseFloat(form.monthly_salary_chf),
       })
       await loadSettings()
-      alert('Ayarlar kaydedildi.')
+      toast.success('Ayarlar kaydedildi')
     } catch (err) {
-      alert('Hata: ' + err.message)
+      toast.error('Hata: ' + err.message)
     } finally {
       setSaving(false)
     }

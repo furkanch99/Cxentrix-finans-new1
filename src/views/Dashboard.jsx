@@ -46,6 +46,32 @@ export default function Dashboard({ data }) {
   const totalExpense = periodTxs.filter(t => t.type === 'expense').reduce((s,t) => s+t.amount, 0)
   const netProfit = totalIncome - totalExpense
   const profitMargin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0
+
+  // Geçen yıl aynı dönem (YoY) karşılaştırması
+  const yoyComparison = useMemo(() => {
+    const prevYear = year - 1
+    const prevTxs = data.transactions.filter(t => {
+      const d = new Date(t.date)
+      if (d.getFullYear() !== prevYear) return false
+      if (isFatihTransferTx(t)) return false
+      if (month !== 'all' && d.getMonth() !== month) return false
+      return true
+    })
+    const prevIncome  = prevTxs.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0)
+    const prevExpense = prevTxs.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0)
+    const prevNet     = prevIncome - prevExpense
+    const pct = (now, prev) => {
+      if (prev === 0) return null
+      return ((now - prev) / Math.abs(prev)) * 100
+    }
+    return {
+      hasData: prevTxs.length > 0,
+      prevIncome, prevExpense, prevNet,
+      incomePct:  pct(totalIncome, prevIncome),
+      expensePct: pct(totalExpense, prevExpense),
+      netPct:     pct(netProfit, prevNet),
+    }
+  }, [data.transactions, year, month, totalIncome, totalExpense, netProfit])
   const monthsWithData = monthly.filter(m => m.inc > 0 || m.exp > 0).length || 1
   const avgMonthlyProfit = month === 'all' ? (monthly.reduce((s,m) => s+m.net, 0) / monthsWithData) : netProfit
 
@@ -121,6 +147,24 @@ export default function Dashboard({ data }) {
         <KPICard label="Net Kar" value={fmtTL(netProfit)} subtitle={`Kar marjı: %${profitMargin.toFixed(1)}`} icon="spark" gradient big Icon={Icon} />
       </div>
 
+      {/* Geçen Yıl Karşılaştırması — sadece geçen yılda da veri varsa */}
+      {yoyComparison.hasData && (
+        <div style={{
+          background: 'var(--bg-card)', border: '1px solid var(--line)',
+          borderRadius: 12, padding: '14px 18px', marginBottom: 14,
+          display: 'grid', gridTemplateColumns: 'auto repeat(3, 1fr)', gap: 18,
+          alignItems: 'center'
+        }}>
+          <div>
+            <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700 }}>Geçen Yıl</div>
+            <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{year - 1} {month !== 'all' ? monthFull(month) : ''}</div>
+          </div>
+          <YoYStat label="Gelir"  pct={yoyComparison.incomePct}  prev={yoyComparison.prevIncome}  positiveIsGood />
+          <YoYStat label="Gider"  pct={yoyComparison.expensePct} prev={yoyComparison.prevExpense} positiveIsGood={false} />
+          <YoYStat label="Net Kar" pct={yoyComparison.netPct}    prev={yoyComparison.prevNet}    positiveIsGood />
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
         <KPICard label={month === 'all' ? 'Aylık Ortalama Kar' : 'Bu Ayın Net Karı'} value={fmtTL(avgMonthlyProfit)} color="blue" Icon={Icon} />
         <KPICard label="En Çok Harcanan Kategori" value={topCategory ? topCategory.n : '—'} subtitle={topCategory ? fmtTL(topCategory.a) : ''} color="amber" Icon={Icon} />
@@ -156,6 +200,29 @@ export default function Dashboard({ data }) {
           <CustomerBarChart data={customerRanking} />
         </ChartCard>
       )}
+    </div>
+  )
+}
+
+function YoYStat({ label, pct, prev, positiveIsGood }) {
+  if (pct == null) {
+    return (
+      <div>
+        <div style={{ fontSize: 11, color: 'var(--ink-muted)', fontWeight: 600 }}>{label}</div>
+        <div className="mono" style={{ fontSize: 13, color: 'var(--ink-muted)' }}>{fmtTL(prev)}</div>
+        <div style={{ fontSize: 10, color: 'var(--ink-faint)' }}>karşılaştırma yok</div>
+      </div>
+    )
+  }
+  const isUp = pct >= 0
+  const isGood = positiveIsGood ? isUp : !isUp
+  const color = isGood ? 'var(--green)' : 'var(--red)'
+  const arrow = isUp ? '▲' : '▼'
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: 'var(--ink-muted)', fontWeight: 600 }}>{label}</div>
+      <div className="mono" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{fmtTL(prev)}</div>
+      <div style={{ fontSize: 11, color, fontWeight: 700, marginTop: 2 }}>{arrow} {Math.abs(pct).toFixed(1)}%</div>
     </div>
   )
 }

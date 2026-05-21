@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import Chart from 'chart.js/auto'
 import { Icon, fmtTL, monthName, monthFull, getChartTheme } from '../utils'
-import { useCurrency, fmtCHF } from '../CurrencyContext'
+import { useCurrency, fmtCHF, FALLBACK_RATE } from '../CurrencyContext'
 import { isFatihTransferTx } from '../fatihHelper'
+import { useToast } from '../Toast'
 
 export default function LogicView({ data }) {
+  const toast = useToast()
   const { getRateAt } = useCurrency()
   const [year, setYear] = useState(new Date().getFullYear())
   const [view, setView] = useState('yearly')
@@ -31,7 +33,7 @@ export default function LogicView({ data }) {
 
       const totalTry = monthTxs.reduce((s, t) => s + t.amount, 0)
       const monthEnd = new Date(year, m + 1, 0).toISOString().slice(0, 10)
-      const rate = getRateAt(monthEnd) || 36
+      const rate = getRateAt(monthEnd) || FALLBACK_RATE
       const totalChf = totalTry / rate
 
       const byCategory = {}
@@ -75,7 +77,7 @@ export default function LogicView({ data }) {
   const handleExportPDF = async () => {
     setExportingPdf(true)
     try {
-      const { jsPDF } = await import('https://cdn.skypack.dev/jspdf@2.5.1')
+      const { jsPDF } = await import('jspdf')
       const pdf = new jsPDF('p', 'mm', 'a4')
       const pageWidth = 210
       let yPos = 20
@@ -152,7 +154,7 @@ export default function LogicView({ data }) {
 
       pdf.save(`Cxentrix-Logic-Raporu-${year}.pdf`)
     } catch (err) {
-      alert('PDF olusturulamadi: ' + err.message)
+      toast.error('PDF oluşturulamadı: ' + err.message)
     } finally {
       setExportingPdf(false)
     }

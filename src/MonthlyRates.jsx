@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Icon, monthFull } from './utils'
 import { fetchYearlyRates, upsertExchangeRate, deleteExchangeRate } from './dataService'
+import { useToast } from './Toast'
 
 export default function MonthlyRates({ reload }) {
+  const toast = useToast()
   const [year, setYear] = useState(new Date().getFullYear())
   const [rates, setRates] = useState({})  // { '2026-01-31': 36.50, ... }
   const [inputs, setInputs] = useState({})  // { 0: '36.50', 1: '37.20', ... } - editable inputs
@@ -54,7 +56,7 @@ export default function MonthlyRates({ reload }) {
   const handleSave = async (month) => {
     const value = parseFloat(inputs[month])
     if (!value || value <= 0) {
-      alert('Geçerli bir kur girin (ör: 36.50)')
+      toast.error('Geçerli bir kur girin (ör: 54.00)')
       return
     }
     setSaving(month)
@@ -67,7 +69,7 @@ export default function MonthlyRates({ reload }) {
       // Tüm uygulamayı yenile - kurlar değişti
       if (reload) await reload()
     } catch (err) {
-      alert('Hata: ' + err.message)
+      toast.error('Hata: ' + err.message)
     } finally {
       setSaving(null)
     }
@@ -88,7 +90,7 @@ export default function MonthlyRates({ reload }) {
       setInputs(prev => ({ ...prev, [month]: '' }))
       if (reload) await reload()
     } catch (err) {
-      alert('Hata: ' + err.message)
+      toast.error('Hata: ' + err.message)
     } finally {
       setSaving(null)
     }
@@ -103,7 +105,7 @@ export default function MonthlyRates({ reload }) {
       }
     }
     if (toSave.length === 0) {
-      alert('Kaydedilecek değişiklik yok.')
+      toast.info('Kaydedilecek değişiklik yok.')
       return
     }
     if (!confirm(`${toSave.length} ay için kur kaydedilecek. Emin misin?`)) return
@@ -115,9 +117,9 @@ export default function MonthlyRates({ reload }) {
       }
       await loadRates()
       if (reload) await reload()
-      alert(`✓ ${toSave.length} kur başarıyla kaydedildi!`)
+      toast.success(`${toSave.length} kur başarıyla kaydedildi`)
     } catch (err) {
-      alert('Hata: ' + err.message)
+      toast.error('Hata: ' + err.message)
     } finally {
       setBulkSaving(false)
     }

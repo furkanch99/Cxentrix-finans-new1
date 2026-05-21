@@ -1,13 +1,23 @@
 import React, { useState, useMemo } from 'react'
 import { Icon, fmt, fmtTL, todayStr, monthFull } from '../utils'
 import { deleteTransaction, deleteInstallmentGroup, updateTransaction } from '../dataService'
+import { useToast } from '../Toast'
+import EmptyState from '../EmptyState'
 
 export default function Transactions({ data, reload }) {
+  const toast = useToast()
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [editTx, setEditTx] = useState(null)
+  const [sortBy, setSortBy] = useState('date')   // 'date' | 'amount' | 'category'
+  const [sortDir, setSortDir] = useState('desc') // 'asc' | 'desc'
+
+  const toggleSort = (col) => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortBy(col); setSortDir(col === 'amount' ? 'desc' : 'desc') }
+  }
 
   const applyQuickRange = (range) => {
     const now = new Date()
@@ -45,8 +55,22 @@ export default function Transactions({ data, reload }) {
     }
     if (dateFrom) l = l.filter(t => t.date >= dateFrom)
     if (dateTo) l = l.filter(t => t.date <= dateTo)
+
+    const dir = sortDir === 'asc' ? 1 : -1
+    l.sort((a, b) => {
+      if (sortBy === 'amount')   return (a.amount - b.amount) * dir
+      if (sortBy === 'category') return a.category.localeCompare(b.category, 'tr') * dir
+      // default: date
+      return a.date.localeCompare(b.date) * dir
+    })
     return l
-  }, [data.transactions, filter, search, dateFrom, dateTo])
+  }, [data.transactions, filter, search, dateFrom, dateTo, sortBy, sortDir])
+
+  const totals = useMemo(() => {
+    let income = 0, expense = 0
+    list.forEach(t => { if (t.type === 'income') income += t.amount; else expense += t.amount })
+    return { income, expense, net: income - expense }
+  }, [list])
 
   const del = async (tx) => {
     if (tx.installmentGroupId) {
@@ -59,13 +83,15 @@ export default function Transactions({ data, reload }) {
       try {
         await deleteInstallmentGroup(tx.installmentGroupId)
         await reload()
-      } catch (err) { alert('Silme hatası: ' + err.message) }
+        toast.success(`${tx.installmentTotal} taksitin tamamı silindi`)
+      } catch (err) { toast.error('Silme hatası: ' + err.message) }
     } else {
       if (!confirm('Bu işlemi silmek istediğine emin misin?')) return
       try {
         await deleteTransaction(tx.id)
         await reload()
-      } catch (err) { alert('Silme hatası: ' + err.message) }
+        toast.success('İşlem silindi')
+      } catch (err) { toast.error('Silme hatası: ' + err.message) }
     }
   }
 
@@ -115,8 +141,26 @@ export default function Transactions({ data, reload }) {
         )}
       </div>
 
+      {list.length === 0 ? (
+        <EmptyState
+          icon="list"
+          title="İşlem bulunamadı"
+          subtitle={search || dateFrom || dateTo || filter !== 'all'
+            ? "Mevcut filtreyi gevşeterek veya temizleyerek tekrar dene."
+            : "Henüz hiç işlem yok. Sol üstteki “Yeni İşlem” butonuyla başla."}
+        />
+      ) : (
       <div style={{ background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--line)', overflow: 'hidden' }}>
-        {list.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-muted)' }}>Kayıt bulunamadı.</div>}
+        {/* Sıralanabilir başlık */}
+        <div style={{ display: 'grid', gridTemplateColumns: '40px 80px 1fr 150px 130px 130px 60px', gap: 12, padding: '10px 18px', alignItems: 'center', borderBottom: '1px solid var(--line)', background: 'var(--bg-elevated)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700 }}>
+          <div></div>
+          <SortHeader label="Tarih"    col="date"     sortBy={sortBy} sortDir={sortDir} onClick={() => toggleSort('date')} />
+          <div>Açıklama</div>
+          <SortHeader label="Kategori" col="category" sortBy={sortBy} sortDir={sortDir} onClick={() => toggleSort('category')} />
+          <div>Ödeme</div>
+          <SortHeader label="Tutar"    col="amount"   sortBy={sortBy} sortDir={sortDir} onClick={() => toggleSort('amount')} align="right" />
+          <div></div>
+        </div>
         {list.map((tx, i) => (
           <div key={tx.id} style={{ display: 'grid', gridTemplateColumns: '40px 80px 1fr 150px 130px 130px 60px', gap: 12, padding: '12px 18px', alignItems: 'center', borderBottom: i < list.length-1 ? '1px solid var(--line-soft)' : 'none' }}>
             <div style={{ width: 30, height: 30, borderRadius: 8, background: tx.type === 'income' ? 'var(--green-soft)' : 'var(--red-soft)', color: tx.type === 'income' ? 'var(--green)' : 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -147,14 +191,49 @@ export default function Transactions({ data, reload }) {
             </div>
           </div>
         ))}
+
+        {/* Toplam satırı — filtrelenmiş seçimin gelir/gider/net özeti */}
+        <div style={{ display: 'grid', gridTemplateColumns: '40px 80px 1fr 150px 130px 130px 60px', gap: 12, padding: '14px 18px', alignItems: 'center', background: 'var(--accent-soft)', borderTop: '2px solid var(--accent)', fontSize: 12, fontWeight: 700 }}>
+          <div></div>
+          <div style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)' }}>Toplam</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{list.length} kayıt</div>
+          <div style={{ fontSize: 11, color: 'var(--green)' }}>Gelir <span className="mono">{fmtTL(totals.income)}</span></div>
+          <div style={{ fontSize: 11, color: 'var(--red)' }}>Gider <span className="mono">{fmtTL(totals.expense)}</span></div>
+          <div className="mono" style={{ fontSize: 13, fontWeight: 700, textAlign: 'right', color: totals.net >= 0 ? 'var(--green)' : 'var(--red)' }}>
+            {totals.net >= 0 ? '+' : '−'}{fmtTL(Math.abs(totals.net))}
+          </div>
+          <div></div>
+        </div>
       </div>
+      )}
 
       {editTx && <EditModal tx={editTx} data={data} onClose={() => setEditTx(null)} onSuccess={async () => { await reload(); setEditTx(null) }} />}
     </div>
   )
 }
 
+function SortHeader({ label, col, sortBy, sortDir, onClick, align = 'left' }) {
+  const active = sortBy === col
+  return (
+    <button onClick={onClick} style={{
+      display: 'flex', alignItems: 'center', gap: 4,
+      justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+      background: 'transparent', border: 'none', cursor: 'pointer',
+      padding: 0, fontSize: 'inherit', fontWeight: 'inherit',
+      letterSpacing: 'inherit', textTransform: 'inherit',
+      color: active ? 'var(--accent)' : 'var(--ink-muted)',
+      textAlign: align,
+    }}>
+      <span>{label}</span>
+      <span style={{ fontSize: 9, lineHeight: 1, opacity: active ? 1 : 0.4 }}>
+        {active ? (sortDir === 'asc' ? '▲' : '▼') : '↕'}
+      </span>
+    </button>
+  )
+}
+
 function EditModal({ tx, data, onClose, onSuccess }) {
+  const toast = useToast()
   const [type, setType] = useState(tx.type)
   const [date, setDate] = useState(tx.date)
   const [amount, setAmount] = useState(tx.amount.toString())
@@ -170,9 +249,9 @@ function EditModal({ tx, data, onClose, onSuccess }) {
 
   const handleSave = async () => {
     const amt = parseFloat(amount)
-    if (!amt || amt <= 0) { alert('Geçerli bir tutar gir.'); return }
-    if (!category) { alert('Kategori seç.'); return }
-    if (!date) { alert('Tarih gir.'); return }
+    if (!amt || amt <= 0) { toast.error('Geçerli bir tutar gir.'); return }
+    if (!category) { toast.error('Kategori seç.'); return }
+    if (!date) { toast.error('Tarih gir.'); return }
 
     setSaving(true)
     try {
@@ -182,9 +261,10 @@ function EditModal({ tx, data, onClose, onSuccess }) {
         paymentType: paymentType || null,
         description: description.trim() || null,
       })
+      toast.success('İşlem güncellendi')
       onSuccess()
     } catch (err) {
-      alert('Hata: ' + err.message)
+      toast.error('Hata: ' + err.message)
     } finally {
       setSaving(false)
     }

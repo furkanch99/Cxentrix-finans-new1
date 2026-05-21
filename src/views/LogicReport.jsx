@@ -3,8 +3,10 @@ import { Icon, fmtTL, monthName, monthFull } from '../utils'
 import { fetchLogicReports, upsertLogicReport } from '../dataService'
 import { useCurrency, fmtCHF } from '../CurrencyContext'
 import { KPICard } from '../charts'
+import { useToast } from '../Toast'
 
 export default function LogicReport({ data }) {
+  const toast = useToast()
   const { getRateAt, latestRate } = useCurrency()
   const [year, setYear] = useState(new Date().getFullYear())
   const [month, setMonth] = useState(new Date().getMonth())
@@ -68,8 +70,9 @@ export default function LogicReport({ data }) {
     try {
       await upsertLogicReport(year, month, newStatus, totalTry, totalChf)
       await loadReports()
+      toast.success('Rapor durumu güncellendi')
     } catch (err) {
-      alert('Hata: ' + err.message)
+      toast.error('Hata: ' + err.message)
     }
   }
 

@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { fetchExchangeRates, getLatestRate, fetchTCMBRate, upsertExchangeRate } from './dataService'
 
+// Tüm CHF<->TL hesaplamaları için ortak fallback kuru.
+// exchange_rates tablosu boş veya henüz yüklenmemiş olduğunda
+// kullanılır. Mevcut iş kuralı: 1 CHF = 54 TL.
+export const FALLBACK_RATE = 54
+
 const CurrencyContext = createContext()
 
 export function CurrencyProvider({ children }) {
@@ -56,20 +61,20 @@ export function CurrencyProvider({ children }) {
 
   // Belirli bir tarih için kur bul (o tarih veya öncesindeki en yakın)
   const getRateAt = (dateStr) => {
-    if (!rates.length) return latestRate?.chf_to_try || 36
+    if (!rates.length) return latestRate?.chf_to_try || FALLBACK_RATE
     const found = rates.find(r => r.date <= dateStr)
-    return found ? found.chf_to_try : (rates[rates.length-1]?.chf_to_try || 36)
+    return found ? found.chf_to_try : (rates[rates.length-1]?.chf_to_try || FALLBACK_RATE)
   }
 
   // TL -> CHF dönüşüm
   const tryToCHF = (amount, dateStr = null) => {
-    const rate = dateStr ? getRateAt(dateStr) : (latestRate?.chf_to_try || 36)
+    const rate = dateStr ? getRateAt(dateStr) : (latestRate?.chf_to_try || FALLBACK_RATE)
     return amount / rate
   }
 
   // CHF -> TL dönüşüm
   const chfToTry = (amount, dateStr = null) => {
-    const rate = dateStr ? getRateAt(dateStr) : (latestRate?.chf_to_try || 36)
+    const rate = dateStr ? getRateAt(dateStr) : (latestRate?.chf_to_try || FALLBACK_RATE)
     return amount * rate
   }
 

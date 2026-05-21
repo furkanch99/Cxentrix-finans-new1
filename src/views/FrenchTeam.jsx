@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Icon, fmtTL, monthName, monthFull } from '../utils'
-import { useCurrency, fmtCHF } from '../CurrencyContext'
+import { useCurrency, fmtCHF, FALLBACK_RATE } from '../CurrencyContext'
 import { fetchCommissions, addCommission, deleteCommission, getRateForDate } from '../dataService'
+import { useToast } from '../Toast'
 
 export default function FrenchTeam({ reload }) {
+  const toast = useToast()
   const { getRateAt } = useCurrency()
   const [commissions, setCommissions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -31,8 +33,9 @@ export default function FrenchTeam({ reload }) {
       await deleteCommission(id)
       await loadData()
       if (reload) await reload()
+      toast.success(`${label} primi silindi`)
     } catch (err) {
-      alert('Hata: ' + err.message)
+      toast.error('Hata: ' + err.message)
     }
   }
 
@@ -120,7 +123,7 @@ export default function FrenchTeam({ reload }) {
             </div>
             {commissions.map(c => {
               const monthEndDate = new Date(c.year, c.month + 1, 0).toISOString().slice(0, 10)
-              const rate = getRateAt(monthEndDate) || 36
+              const rate = getRateAt(monthEndDate) || FALLBACK_RATE
               const tl = parseFloat(c.total_chf) * rate
               return (
                 <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '120px 80px 80px 110px 110px 1fr 40px', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--line-soft)', alignItems: 'center' }}>
@@ -153,6 +156,7 @@ export default function FrenchTeam({ reload }) {
 }
 
 function AddCommissionModal({ onClose, onSuccess }) {
+  const toast = useToast()
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
@@ -196,19 +200,20 @@ function AddCommissionModal({ onClose, onSuccess }) {
 
   const handleSave = async () => {
     if (totalChf === 0) {
-      alert('Sales veya Retention sayısı 0 olamaz.')
+      toast.error('Sales veya Retention sayısı 0 olamaz.')
       return
     }
     if (!rateNum || rateNum <= 0) {
-      alert('Geçerli bir kur girin.')
+      toast.error('Geçerli bir kur girin.')
       return
     }
     setSaving(true)
     try {
       await addCommission(year, month, salesCount, retentionCount, notes, isRateManual ? rateNum : null)
+      toast.success('French Team primi eklendi')
       onSuccess()
     } catch (err) {
-      alert('Hata: ' + err.message)
+      toast.error('Hata: ' + err.message)
     } finally {
       setSaving(false)
     }

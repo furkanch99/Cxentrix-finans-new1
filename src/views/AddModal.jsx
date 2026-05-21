@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { Icon, fmtTL, todayStr, monthFull } from '../utils'
 import { addTransaction, addInstallmentTransaction } from '../dataService'
+import { useToast } from '../Toast'
 
 export default function AddModal({ data, reload, onClose }) {
+  const toast = useToast()
   const [form, setForm] = useState({
     type: 'expense', date: todayStr(), amount: '',
     category: '', customer: '',
@@ -26,7 +28,7 @@ export default function AddModal({ data, reload, onClose }) {
 
   const submit = async () => {
     if (!form.amount || !form.category) {
-      alert('Tutar ve kategori zorunlu.')
+      toast.error('Tutar ve kategori zorunlu.')
       return
     }
     setSaving(true)
@@ -36,16 +38,18 @@ export default function AddModal({ data, reload, onClose }) {
           ...form,
           amount: parseFloat(form.amount)
         }, installmentCount)
+        toast.success(`${installmentCount} taksitli işlem eklendi`)
       } else {
         await addTransaction({
           ...form,
           amount: parseFloat(form.amount)
         })
+        toast.success('İşlem eklendi')
       }
       await reload()
       onClose()
     } catch (err) {
-      alert('Kaydetme hatası: ' + err.message)
+      toast.error('Kaydetme hatası: ' + err.message)
     } finally {
       setSaving(false)
     }

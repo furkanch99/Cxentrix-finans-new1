@@ -2,8 +2,10 @@ import React, { useState, useMemo } from 'react'
 import { Icon, fmtTL, monthFull } from '../utils'
 import { KPICard } from '../charts'
 import { setPaymentStatus, bulkSetPaymentStatus } from '../dataService'
+import { useToast } from '../Toast'
 
 export default function PersonnelReport({ data, reload }) {
+  const toast = useToast()
   const COMPANY_PAYMENT_KEYWORDS = [
     'kuveyttürk',
     'banka',
@@ -188,13 +190,13 @@ export default function PersonnelReport({ data, reload }) {
 
       if (reload) await reload()
     } catch (err) {
-      alert('Hata: ' + err.message)
+      toast.error('Hata: ' + err.message)
     }
   }
 
   const handleBulkMark = async (markAsPaid) => {
     if (selectedTxIds.size === 0) {
-      alert('Önce işlem seçin.')
+      toast.error('Önce işlem seçin.')
       return
     }
 
@@ -220,7 +222,7 @@ export default function PersonnelReport({ data, reload }) {
 
       if (reload) await reload()
     } catch (err) {
-      alert('Hata: ' + err.message)
+      toast.error('Hata: ' + err.message)
     } finally {
       setBulkLoading(false)
     }

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { FALLBACK_RATE } from './CurrencyContext'
 
 // === TRANSACTIONS ===
 export async function fetchTransactions() {
@@ -202,7 +203,7 @@ export async function addCommission(year, month, salesCount, retentionCount, not
     rateValue = manualRate
   } else {
     const rate = await getRateForDate(monthEndDate)
-    rateValue = rate ? parseFloat(rate.chf_to_try) : 36
+    rateValue = rate ? parseFloat(rate.chf_to_try) : FALLBACK_RATE
   }
 
   const totalTry = totalChf * rateValue
@@ -297,7 +298,7 @@ export async function accrueFatihSalary(year, month, salaryChf, manualRate = nul
     rateValue = manualRate
   } else {
     const rate = await getRateForDate(monthStart)
-    rateValue = rate ? parseFloat(rate.chf_to_try) : 36
+    rateValue = rate ? parseFloat(rate.chf_to_try) : FALLBACK_RATE
   }
 
   const totalTry = salaryChf * rateValue

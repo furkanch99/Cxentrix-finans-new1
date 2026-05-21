@@ -16,6 +16,7 @@ import CurrencyTicker from './CurrencyTicker'
 import Login from './Login'
 import { Icon, LOGO_URL } from './utils'
 import { CurrencyProvider } from './CurrencyContext'
+import { ToastProvider, useToast } from './Toast'
 import { fetchTransactions, fetchCategories, fetchPaymentTypes, fetchPaymentStatuses } from './dataService'
 
 export default function App() {
@@ -41,27 +42,39 @@ export default function App() {
     )
   }
 
-  if (!session) return <Login />
+  if (!session) {
+    return <ToastProvider><Login /></ToastProvider>
+  }
 
   return (
-    <CurrencyProvider>
-      <AppInner session={session} />
-    </CurrencyProvider>
+    <ToastProvider>
+      <CurrencyProvider>
+        <AppInner session={session} />
+      </CurrencyProvider>
+    </ToastProvider>
   )
 }
 
 function AppInner({ session }) {
+  const toast = useToast()
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('cxentrix-theme') || 'light' } catch { return 'light' }
   })
   const [mode, setMode] = useState(() => {
     try { return localStorage.getItem('cxentrix-mode') || 'cxentrix' } catch { return 'cxentrix' }
   })
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('cxentrix-sidebar') === 'collapsed' } catch { return false }
+  })
 
   const [data, setData] = useState({ transactions: [], categories: [], paymentTypes: [], paymentStatuses: [] })
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState('dashboard')
   const [showAdd, setShowAdd] = useState(false)
+
+  useEffect(() => {
+    try { localStorage.setItem('cxentrix-sidebar', sidebarCollapsed ? 'collapsed' : 'open') } catch {}
+  }, [sidebarCollapsed])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -90,7 +103,7 @@ function AppInner({ session }) {
       setData({ transactions, categories, paymentTypes, paymentStatuses })
     } catch (err) {
       console.error(err)
-      alert('Veriler yüklenemedi: ' + err.message)
+      toast.error('Veriler yüklenemedi: ' + err.message)
     } finally {
       setLoading(false)
     }
@@ -109,7 +122,18 @@ function AppInner({ session }) {
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <CurrencyTicker />
       <div style={{ display: 'flex', flex: 1 }}>
-        <Sidebar mode={mode} view={view} setView={setView} onAdd={() => setShowAdd(true)} theme={theme} toggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')} user={session?.user || { email: '' }} onLogout={() => supabase.auth.signOut()} />
+        <Sidebar
+          mode={mode}
+          view={view}
+          setView={setView}
+          onAdd={() => setShowAdd(true)}
+          theme={theme}
+          toggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+          user={session?.user || { email: '' }}
+          onLogout={() => supabase.auth.signOut()}
+          collapsed={sidebarCollapsed}
+          toggleCollapsed={() => setSidebarCollapsed(c => !c)}
+        />
         <main style={{ flex: 1, padding: '20px 36px 28px', maxWidth: 1600, width: '100%' }}>
           <Header view={view} mode={mode} setMode={setMode} />
           <div className="fade-in">
@@ -132,7 +156,7 @@ function AppInner({ session }) {
   )
 }
 
-function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onLogout }) {
+function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onLogout, collapsed, toggleCollapsed }) {
   const cxentrixItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', section: 'main' },
     { id: 'transactions', label: 'İşlemler', icon: 'list', section: 'main' },
@@ -159,14 +183,16 @@ function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onLogou
     ? 'brightness(0) invert(1) drop-shadow(0 0 8px rgba(99, 102, 241, 0.6))'
     : 'drop-shadow(0 2px 6px rgba(99, 102, 241, 0.25))'
 
+  const c = !!collapsed
   return (
     <aside style={{
-      width: 240, borderRight: '1px solid var(--line)', padding: '20px 16px',
+      width: c ? 68 : 240, borderRight: '1px solid var(--line)', padding: c ? '20px 10px' : '20px 16px',
       background: 'var(--bg-sidebar)', position: 'sticky', top: 0, height: '100vh',
-      display: 'flex', flexDirection: 'column', flexShrink: 0, overflowY: 'auto'
+      display: 'flex', flexDirection: 'column', flexShrink: 0, overflowY: 'auto',
+      transition: 'width 0.22s ease, padding 0.22s ease'
     }}>
-      <div style={{ marginBottom: 22, paddingLeft: 6, paddingRight: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6, paddingLeft: c ? 0 : 6, justifyContent: c ? 'center' : 'flex-start' }}>
           <div style={{ position: 'relative', width: 42, height: 42, flexShrink: 0 }}>
             <div className="sidebar-logo-glow" style={{
               position: 'absolute', inset: -8,
@@ -179,38 +205,65 @@ function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onLogou
               filter: logoFilter, transition: 'filter 0.3s'
             }} onError={(e) => { e.target.style.display = 'none' }}/>
           </div>
-          <div>
-            <div className="display" style={{
-              fontSize: 19, lineHeight: 1, marginBottom: 3,
-              background: 'linear-gradient(135deg, var(--ink) 0%, var(--accent) 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text', fontWeight: 700
-            }}>Cxentrix</div>
-            <div style={{
-              fontSize: 9, letterSpacing: '0.22em', textTransform: 'uppercase',
-              color: 'var(--ink-muted)', fontWeight: 600
-            }}>Solutions</div>
+          {!c && (
+            <div>
+              <div className="display" style={{
+                fontSize: 19, lineHeight: 1, marginBottom: 3,
+                background: 'linear-gradient(135deg, var(--ink) 0%, var(--accent) 100%)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text', fontWeight: 700
+              }}>Cxentrix</div>
+              <div style={{
+                fontSize: 9, letterSpacing: '0.22em', textTransform: 'uppercase',
+                color: 'var(--ink-muted)', fontWeight: 600
+              }}>Solutions</div>
+            </div>
+          )}
+        </div>
+        {!c && (
+          <div style={{
+            fontSize: 10, color: mode === 'logic' ? 'var(--accent)' : 'var(--ink-faint)',
+            marginTop: 8, paddingLeft: 6,
+            fontWeight: mode === 'logic' ? 700 : 500,
+            letterSpacing: mode === 'logic' ? '0.1em' : 'normal',
+            textTransform: mode === 'logic' ? 'uppercase' : 'none'
+          }}>
+            {mode === 'logic' ? 'Logic Holding Modu' : 'Finans Yönetim Paneli'}
           </div>
-        </div>
-        <div style={{
-          fontSize: 10, color: mode === 'logic' ? 'var(--accent)' : 'var(--ink-faint)',
-          marginTop: 8, paddingLeft: 2,
-          fontWeight: mode === 'logic' ? 700 : 500,
-          letterSpacing: mode === 'logic' ? '0.1em' : 'normal',
-          textTransform: mode === 'logic' ? 'uppercase' : 'none'
-        }}>
-          {mode === 'logic' ? 'Logic Holding Modu' : 'Finans Yönetim Paneli'}
-        </div>
+        )}
       </div>
 
+      {/* Collapse toggle */}
+      {toggleCollapsed && (
+        <button
+          onClick={toggleCollapsed}
+          title={c ? 'Menüyü genişlet' : 'Menüyü daralt'}
+          aria-label={c ? 'Menüyü genişlet' : 'Menüyü daralt'}
+          style={{
+            alignSelf: c ? 'center' : 'flex-end',
+            marginBottom: 10,
+            width: 28, height: 28, borderRadius: 7,
+            background: 'var(--bg-input)', border: '1px solid var(--line)',
+            color: 'var(--ink-muted)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'transform 0.22s ease'
+          }}
+        >
+          <Icon name={c ? 'arrowRight' : 'arrowLeft'} size={12} />
+        </button>
+      )}
+
       {mode === 'cxentrix' && (
-        <button onClick={onAdd} style={{
+        <button onClick={onAdd} title="Yeni İşlem" style={{
           background: 'var(--gradient-1)', color: 'white',
-          padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-          marginBottom: 18, display: 'flex', alignItems: 'center', gap: 8,
-          justifyContent: 'center', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)'
+          padding: c ? '9px 0' : '10px 14px', borderRadius: 10,
+          fontSize: 13, fontWeight: 600,
+          marginBottom: 18, display: 'flex', alignItems: 'center',
+          gap: c ? 0 : 8,
+          justifyContent: 'center',
+          boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)'
         }}>
-          <Icon name="plus" size={16} /> Yeni İşlem
+          <Icon name="plus" size={16} />{!c && ' Yeni İşlem'}
         </button>
       )}
 
@@ -220,16 +273,24 @@ function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onLogou
           if (sectionItems.length === 0) return null
           return (
             <div key={sectionId} style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--ink-faint)', fontWeight: 700, padding: '0 12px 6px' }}>{sectionLabel}</div>
+              {!c && (
+                <div style={{ fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--ink-faint)', fontWeight: 700, padding: '0 12px 6px' }}>{sectionLabel}</div>
+              )}
               {sectionItems.map(item => (
-                <button key={item.id} onClick={() => setView(item.id)} className="nav-item" style={{
-                  padding: '8px 12px', borderRadius: 7, fontSize: 12, textAlign: 'left',
-                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                  background: view === item.id ? 'var(--accent-soft)' : 'transparent',
-                  color: view === item.id ? 'var(--accent)' : 'var(--ink-soft)',
-                  fontWeight: view === item.id ? 600 : 500, transition: 'all 0.15s'
-                }}>
-                  <Icon name={item.icon} size={14} />{item.label}
+                <button key={item.id} onClick={() => setView(item.id)} className="nav-item"
+                  title={c ? item.label : undefined}
+                  style={{
+                    padding: c ? '9px 0' : '8px 12px',
+                    borderRadius: 7, fontSize: 12, textAlign: c ? 'center' : 'left',
+                    display: 'flex', alignItems: 'center',
+                    gap: c ? 0 : 10, width: '100%',
+                    justifyContent: c ? 'center' : 'flex-start',
+                    background: view === item.id ? 'var(--accent-soft)' : 'transparent',
+                    color: view === item.id ? 'var(--accent)' : 'var(--ink-soft)',
+                    fontWeight: view === item.id ? 600 : 500, transition: 'all 0.15s'
+                  }}
+                >
+                  <Icon name={item.icon} size={14} />{!c && item.label}
                 </button>
               ))}
             </div>
@@ -238,20 +299,34 @@ function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onLogou
       </nav>
 
       <div style={{ marginTop: 'auto', borderTop: '1px solid var(--line)', paddingTop: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 6px', marginBottom: 4 }}>
-          <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--gradient-1)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>
-            {(user?.email?.[0] || '?').toUpperCase()}
+        {!c && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 6px', marginBottom: 4 }}>
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--gradient-1)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>
+              {(user?.email?.[0] || '?').toUpperCase()}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
+            </div>
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
-          </div>
-        </div>
-        <button onClick={toggleTheme} style={{ width: '100%', padding: '6px 10px', borderRadius: 7, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-muted)', marginBottom: 3 }}>
-          <Icon name={theme === 'light' ? 'moon' : 'sun'} size={12} />{theme === 'light' ? 'Koyu Tema' : 'Açık Tema'}
+        )}
+        <button onClick={toggleTheme} title={theme === 'light' ? 'Koyu Tema' : 'Açık Tema'}
+          style={{
+            width: '100%', padding: c ? '8px 0' : '6px 10px',
+            borderRadius: 7, fontSize: 11, display: 'flex', alignItems: 'center',
+            gap: c ? 0 : 8, justifyContent: c ? 'center' : 'flex-start',
+            color: 'var(--ink-muted)', marginBottom: 3
+          }}>
+          <Icon name={theme === 'light' ? 'moon' : 'sun'} size={12} />{!c && (theme === 'light' ? 'Koyu Tema' : 'Açık Tema')}
         </button>
         {onLogout && (
-          <button onClick={onLogout} style={{ width: '100%', padding: '6px 10px', borderRadius: 7, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-muted)' }}>
-            <Icon name="settings" size={12} />Çıkış Yap
+          <button onClick={onLogout} title="Çıkış Yap"
+            style={{
+              width: '100%', padding: c ? '8px 0' : '6px 10px',
+              borderRadius: 7, fontSize: 11, display: 'flex', alignItems: 'center',
+              gap: c ? 0 : 8, justifyContent: c ? 'center' : 'flex-start',
+              color: 'var(--ink-muted)'
+            }}>
+            <Icon name="logout" size={12} />{!c && 'Çıkış Yap'}
           </button>
         )}
       </div>

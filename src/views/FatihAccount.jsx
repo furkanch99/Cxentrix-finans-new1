@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Icon, fmtTL, monthName, monthFull } from '../utils'
-import { useCurrency, fmtCHF } from '../CurrencyContext'
+import { useCurrency, fmtCHF, FALLBACK_RATE } from '../CurrencyContext'
 import { fetchFatihSettings, fetchFatihSalaries, accrueFatihSalary, deleteFatihSalary, getRateForDate } from '../dataService'
 import { isFatihTransferTx } from '../fatihHelper'
 import { PaymentPieChart } from '../charts'
+import { useToast } from '../Toast'
 
 const safeNumber = (v, def = 0) => {
   const n = parseFloat(v)
@@ -11,7 +12,7 @@ const safeNumber = (v, def = 0) => {
 }
 const safeRate = (rate) => {
   const r = parseFloat(rate)
-  if (!r || isNaN(r) || !isFinite(r) || r <= 0) return 36
+  if (!r || isNaN(r) || !isFinite(r) || r <= 0) return FALLBACK_RATE
   return r
 }
 const safeDate = (date) => {
@@ -24,6 +25,7 @@ const safeDate = (date) => {
 }
 
 export default function FatihAccount({ data, reload }) {
+  const toast = useToast()
   const currency = useCurrency()
   const getRateAt = currency?.getRateAt || (() => 36)
 
@@ -57,8 +59,8 @@ export default function FatihAccount({ data, reload }) {
   }
 
   const getSafeRate = (date) => {
-    if (!date) return 36
-    try { return safeRate(getRateAt(date)) } catch { return 36 }
+    if (!date) return FALLBACK_RATE
+    try { return safeRate(getRateAt(date)) } catch { return FALLBACK_RATE }
   }
 
   const fatihData = useMemo(() => {
@@ -168,8 +170,9 @@ export default function FatihAccount({ data, reload }) {
       await deleteFatihSalary(id)
       await loadData()
       if (reload) await reload()
+      toast.success('Maaş tahakkuku silindi')
     } catch (err) {
-      alert('Hata: ' + err.message)
+      toast.error('Hata: ' + err.message)
     }
   }
 
@@ -572,6 +575,7 @@ function EmptyState({ text }) {
 
 // ============= MAAŞ TAHAKKUK MODALI (YENİ) =============
 function AccrueSalaryModal({ settings, existingSalaries, onClose, onSuccess }) {
+  const modalToast = useToast()
   const now = new Date()
   const defaultSalary = safeNumber(settings.monthly_salary_chf, 4000)
 
@@ -621,15 +625,15 @@ function AccrueSalaryModal({ settings, existingSalaries, onClose, onSuccess }) {
 
   const handleSave = async () => {
     if (isAlreadyAccrued) {
-      alert(`${monthFull(month)} ${year} için maaş zaten tahakkuk ettirilmiş!`)
+      modalToast.error(`${monthFull(month)} ${year} için maaş zaten tahakkuk ettirilmiş!`)
       return
     }
     if (salaryNum <= 0) {
-      alert('Geçerli bir maaş tutarı girin (CHF).')
+      modalToast.error('Geçerli bir maaş tutarı girin (CHF).')
       return
     }
     if (rateNum <= 0) {
-      alert('Geçerli bir kur girin.')
+      modalToast.error('Geçerli bir kur girin.')
       return
     }
 
@@ -639,9 +643,10 @@ function AccrueSalaryModal({ settings, existingSalaries, onClose, onSuccess }) {
     try {
       // Hem kur hem CHF manuel olabilir - dataService'e ikisini de geçeceğiz
       await accrueFatihSalary(year, month, salaryNum, isRateManual ? rateNum : null)
+      modalToast.success(`${monthFull(month)} ${year} maaşı tahakkuk ettirildi`)
       onSuccess()
     } catch (err) {
-      alert('Hata: ' + err.message)
+      modalToast.error('Hata: ' + err.message)
     } finally {
       setSaving(false)
     }
@@ -813,7 +818,7 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
   const monthlyHakedis = useMemo(() => {
     const months = Array.from({length: 12}, (_, m) => ({
       month: m, hakedisChf: 0, salaryChf: 0, frenchChf: 0,
-      transferTry: 0, transferChf: 0, rate: 36
+      transferTry: 0, transferChf: 0, rate: FALLBACK_RATE
     }))
 
     // salaryTxs aslında fatih_monthly_salaries kayıtlarıdır:
