@@ -81,79 +81,318 @@ export default function LogicView({ data }) {
       const { jsPDF } = await import('jspdf')
       const pdf = new jsPDF('p', 'mm', 'a4')
       const pageWidth = 210
+      const pageHeight = 297
+      const M = 15  // margin
       let yPos = 20
 
-      pdf.setFontSize(20)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('CXENTRIX SOLUTIONS', pageWidth / 2, yPos, { align: 'center' })
-      yPos += 7
+      // --- Turkish -> ASCII (helvetica doesn't support full TR charset) ---
+      const tr = (s) => String(s ?? '')
+        .replace(/ş/g, 's').replace(/Ş/g, 'S')
+        .replace(/ı/g, 'i').replace(/İ/g, 'I')
+        .replace(/ğ/g, 'g').replace(/Ğ/g, 'G')
+        .replace(/ç/g, 'c').replace(/Ç/g, 'C')
+        .replace(/ö/g, 'o').replace(/Ö/g, 'O')
+        .replace(/ü/g, 'u').replace(/Ü/g, 'U')
+
+      const tlFmt  = (n) => Math.round(n).toLocaleString('en-US').replace(/,/g, '.') + ' TL'
+      const chfFmt = (n) => 'CHF ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+      const monthLabels = ['Ocak','Subat','Mart','Nisan','Mayis','Haziran','Temmuz','Agustos','Eylul','Ekim','Kasim','Aralik']
+
+      // --- Geçen yıl karşılaştırması için veriyi hesapla ---
+      const prevYear = year - 1
+      const prevYearExpensesTry = data.transactions.reduce((s, t) => {
+        if (t.type !== 'expense') return s
+        const d = new Date(t.date)
+        if (d.getFullYear() !== prevYear) return s
+        if (isFatihTransferTx(t)) return s
+        return s + t.amount
+      }, 0)
+      const yoyDiff = yearTotalTry - prevYearExpensesTry
+      const yoyPct = prevYearExpensesTry > 0 ? (yoyDiff / prevYearExpensesTry) * 100 : null
+
+      // --- En yüksek/düşük aylar ---
+      const activeMonthRows = monthlySummary.filter(m => m.totalTry > 0)
+      const sortedByTl = [...activeMonthRows].sort((a, b) => b.totalTry - a.totalTry)
+      const maxMonth = sortedByTl[0] || null
+      const minMonth = sortedByTl[sortedByTl.length - 1] || null
+      const topCat = yearlyCategoryDist[0] || null
+      const top3 = yearlyCategoryDist.slice(0, 3)
+      const top3Pct = top3.reduce((s, c) => s + (yearTotalTry > 0 ? c.tl / yearTotalTry : 0), 0) * 100
+
+      // --- Helper drawing functions ---
+      const ensureRoom = (need = 12) => {
+        if (yPos + need > pageHeight - 20) { pdf.addPage(); yPos = 20 }
+      }
+      const sectionTitle = (text, accent = [99, 102, 241]) => {
+        ensureRoom(14)
+        pdf.setFillColor(...accent)
+        pdf.rect(M, yPos - 4, 3, 7, 'F')
+        pdf.setFontSize(13)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setTextColor(30)
+        pdf.text(tr(text), M + 6, yPos + 1)
+        yPos += 9
+      }
+      const subTitle = (text) => {
+        ensureRoom(10)
+        pdf.setFontSize(10.5)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setTextColor(60)
+        pdf.text(tr(text), M, yPos)
+        yPos += 6
+      }
+      const para = (text, lineHeight = 5) => {
+        pdf.setFontSize(9.5)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor(60)
+        const lines = pdf.splitTextToSize(tr(text), pageWidth - 2 * M)
+        lines.forEach(line => {
+          ensureRoom(lineHeight + 1)
+          pdf.text(line, M, yPos)
+          yPos += lineHeight
+        })
+      }
+      const hr = () => {
+        ensureRoom(6)
+        pdf.setDrawColor(220)
+        pdf.line(M, yPos, pageWidth - M, yPos)
+        yPos += 4
+      }
+
+      // === KAPAK ===
+      // Üst aksanlı band
+      pdf.setFillColor(26, 31, 46)
+      pdf.rect(0, 0, pageWidth, 48, 'F')
+      pdf.setFillColor(99, 102, 241)
+      pdf.rect(0, 48, pageWidth, 2, 'F')
+
       pdf.setFontSize(11)
       pdf.setFont('helvetica', 'normal')
-      pdf.text(`Logic Holding Maliyet Raporu - ${year}`, pageWidth / 2, yPos, { align: 'center' })
-      yPos += 5
-      pdf.setFontSize(9)
-      pdf.setTextColor(120)
-      pdf.text(`Hazirlanma: ${new Date().toLocaleDateString('tr-TR')}`, pageWidth / 2, yPos, { align: 'center' })
-      yPos += 10
+      pdf.setTextColor(180, 188, 208)
+      pdf.text('CXENTRIX SOLUTIONS', M, 18)
 
-      pdf.setTextColor(0)
-      pdf.setFontSize(13)
+      pdf.setFontSize(22)
       pdf.setFont('helvetica', 'bold')
-      pdf.text('Yillik Ozet', 15, yPos)
-      yPos += 7
-
-      pdf.setFontSize(10)
-      pdf.setFont('helvetica', 'normal')
-      pdf.text(`Toplam Maliyet: ${yearTotalChf.toFixed(2)} CHF`, 15, yPos)
-      pdf.text(`(${yearTotalTry.toLocaleString('tr-TR', {maximumFractionDigits: 2})} TL)`, 90, yPos)
-      yPos += 6
-      pdf.text(`Aylik Ortalama: ${avgMonthlyChf.toFixed(2)} CHF`, 15, yPos)
-      yPos += 6
-      pdf.text(`Aktif Ay: ${activeMonths} ay`, 15, yPos)
-      yPos += 12
-
-      pdf.setFontSize(13)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Aylik Dokum', 15, yPos)
-      yPos += 7
-
-      pdf.setFontSize(9)
-      pdf.setFillColor(99, 102, 241)
       pdf.setTextColor(255)
-      pdf.rect(15, yPos - 4, pageWidth - 30, 7, 'F')
-      pdf.text('Ay', 18, yPos)
-      pdf.text('Islem', 50, yPos)
-      pdf.text('TL', 90, yPos)
-      pdf.text('CHF', 140, yPos)
-      pdf.text('Kur', 175, yPos)
+      pdf.text('Logic Holding Maliyet Raporu', M, 30)
+
+      pdf.setFontSize(11)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(180, 188, 208)
+      pdf.text(`${year} Yili - Donem Sonu Ozeti`, M, 39)
+
+      pdf.setFontSize(9)
+      pdf.setTextColor(200)
+      pdf.text(`Hazirlanma: ${new Date().toLocaleDateString('tr-TR')}`, pageWidth - M, 18, { align: 'right' })
+      pdf.text(`Rapor No: LHR-${year}-${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}`, pageWidth - M, 24, { align: 'right' })
+
+      yPos = 62
+
+      // === YONETICI OZETI ===
+      sectionTitle('Yonetici Ozeti')
+      const yoyText = yoyPct != null
+        ? `Bir onceki yila (${prevYear}) gore toplam maliyet ${yoyDiff >= 0 ? 'artisi' : 'azalisi'} ${Math.abs(yoyPct).toFixed(1)}% (${tlFmt(Math.abs(yoyDiff))}) seviyesindedir.`
+        : `${prevYear} icin karsilastirilabilir veri bulunamadi.`
+      const summaryText = `Cxentrix Solutions'in ${year} yili boyunca Logic Holding kapsaminda gerceklesen toplam isletme maliyeti ${chfFmt(yearTotalChf)} (${tlFmt(yearTotalTry)}) olarak kayda gecmistir. Bu tutar, ${activeMonths} aktif ay boyunca olusan ${monthlySummary.reduce((s, m) => s + m.transactionCount, 0)} adet gider islemini kapsar; aylik ortalama ${chfFmt(avgMonthlyChf)} seviyesindedir. ${maxMonth ? `En yuksek harcama ${monthLabels[maxMonth.month]} ayinda ${tlFmt(maxMonth.totalTry)} ile gerceklesmistir.` : ''} ${yoyText} En cok maliyet uretten ${top3.length} kategori, yillik toplamin ${top3Pct.toFixed(1)}% lik kismini olusturmaktadir; bu durum maliyet konsantrasyonunu net olarak ortaya koymaktadir.`
+      para(summaryText, 5.5)
+      yPos += 4
+
+      // === ANA KPI'LAR (kart goruntusu) ===
+      sectionTitle('Yillik Performans Gostergeleri')
+      const kpiBoxes = [
+        { label: 'Yillik Toplam (CHF)', value: chfFmt(yearTotalChf), accent: [99, 102, 241] },
+        { label: 'Yillik Toplam (TL)',  value: tlFmt(yearTotalTry),  accent: [139, 92, 246] },
+        { label: 'Aylik Ortalama',      value: chfFmt(avgMonthlyChf), accent: [16, 185, 129] },
+        { label: 'Aktif Ay',            value: `${activeMonths} ay`,  accent: [245, 158, 11] },
+      ]
+      const colWidth = (pageWidth - 2 * M - 6) / 2
+      kpiBoxes.forEach((b, i) => {
+        const col = i % 2
+        const row = Math.floor(i / 2)
+        const x = M + col * (colWidth + 6)
+        const y = yPos + row * 18
+        pdf.setFillColor(245, 246, 250)
+        pdf.rect(x, y, colWidth, 16, 'F')
+        pdf.setFillColor(...b.accent)
+        pdf.rect(x, y, 2.5, 16, 'F')
+        pdf.setFontSize(8)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor(110)
+        pdf.text(tr(b.label).toUpperCase(), x + 6, y + 5)
+        pdf.setFontSize(12)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setTextColor(25)
+        pdf.text(tr(b.value), x + 6, y + 12)
+      })
+      yPos += 18 * Math.ceil(kpiBoxes.length / 2) + 6
+
+      // === YoY karsilastirma kutusu ===
+      if (yoyPct != null) {
+        ensureRoom(22)
+        const isUp = yoyDiff >= 0
+        const ribbon = isUp ? [239, 68, 68] : [16, 185, 129]
+        pdf.setFillColor(248, 250, 252)
+        pdf.rect(M, yPos, pageWidth - 2 * M, 16, 'F')
+        pdf.setFillColor(...ribbon)
+        pdf.rect(M, yPos, 2.5, 16, 'F')
+        pdf.setFontSize(8)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor(110)
+        pdf.text(`${prevYear} VS ${year} KARSILASTIRMA`, M + 6, yPos + 5)
+        pdf.setFontSize(11)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setTextColor(25)
+        pdf.text(`${prevYear}: ${tlFmt(prevYearExpensesTry)}`, M + 6, yPos + 12)
+        pdf.text(`${year}: ${tlFmt(yearTotalTry)}`, M + 78, yPos + 12)
+        pdf.setTextColor(...ribbon)
+        pdf.text(`${isUp ? '+' : ''}${yoyDiff < 0 ? '-' : ''}${tlFmt(Math.abs(yoyDiff))}  (${isUp ? '+' : '-'}${Math.abs(yoyPct).toFixed(1)}%)`, pageWidth - M - 2, yPos + 12, { align: 'right' })
+        yPos += 22
+      }
+
+      // === AYLIK DOKUM TABLOSU ===
+      pdf.addPage(); yPos = 20
+      sectionTitle('Aylik Dokum')
+
+      // Header
+      pdf.setFillColor(99, 102, 241)
+      pdf.rect(M, yPos - 4, pageWidth - 2 * M, 7, 'F')
+      pdf.setFontSize(9)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(255)
+      pdf.text('Ay', M + 3, yPos)
+      pdf.text('Islem', M + 35, yPos)
+      pdf.text('TL', M + 55, yPos, { align: 'left' })
+      pdf.text('CHF', M + 105, yPos, { align: 'left' })
+      pdf.text('Kur', M + 140, yPos, { align: 'left' })
+      pdf.text('% Yillik', pageWidth - M - 3, yPos, { align: 'right' })
       yPos += 7
 
-      pdf.setTextColor(0)
       pdf.setFont('helvetica', 'normal')
-
-      monthlySummary.forEach((m, idx) => {
-        if (m.totalTry === 0) return
-        if (yPos > 270) { pdf.addPage(); yPos = 20 }
-        if (idx % 2 === 0) { pdf.setFillColor(245, 246, 250); pdf.rect(15, yPos - 4, pageWidth - 30, 6, 'F') }
-        const monthLabels = ['Ocak','Subat','Mart','Nisan','Mayis','Haziran','Temmuz','Agustos','Eylul','Ekim','Kasim','Aralik']
-        pdf.text(`${monthLabels[m.month]} ${year}`, 18, yPos)
-        pdf.text(String(m.transactionCount), 50, yPos)
-        pdf.text(m.totalTry.toLocaleString('tr-TR', {maximumFractionDigits: 2}), 90, yPos)
-        pdf.text(m.totalChf.toFixed(2), 140, yPos)
-        pdf.text(m.rate.toFixed(4), 175, yPos)
+      pdf.setTextColor(40)
+      activeMonthRows.forEach((m, idx) => {
+        ensureRoom(7)
+        if (idx % 2 === 0) {
+          pdf.setFillColor(247, 248, 252)
+          pdf.rect(M, yPos - 4, pageWidth - 2 * M, 6, 'F')
+        }
+        const pctOfYear = yearTotalTry > 0 ? (m.totalTry / yearTotalTry) * 100 : 0
+        pdf.text(`${monthLabels[m.month]} ${year}`, M + 3, yPos)
+        pdf.text(String(m.transactionCount), M + 35, yPos)
+        pdf.text(tlFmt(m.totalTry), M + 55, yPos)
+        pdf.text(chfFmt(m.totalChf), M + 105, yPos)
+        pdf.text(m.rate.toFixed(4), M + 140, yPos)
+        pdf.text(`%${pctOfYear.toFixed(1)}`, pageWidth - M - 3, yPos, { align: 'right' })
         yPos += 6
       })
 
-      yPos += 3
+      // Toplam satiri
+      yPos += 2
       pdf.setFillColor(99, 102, 241)
-      pdf.setTextColor(255)
-      pdf.rect(15, yPos - 4, pageWidth - 30, 7, 'F')
+      pdf.rect(M, yPos - 4, pageWidth - 2 * M, 7, 'F')
+      pdf.setFontSize(9.5)
       pdf.setFont('helvetica', 'bold')
-      pdf.text('TOPLAM', 18, yPos)
-      pdf.text(yearTotalTry.toLocaleString('tr-TR', {maximumFractionDigits: 2}), 90, yPos)
-      pdf.text(yearTotalChf.toFixed(2), 140, yPos)
+      pdf.setTextColor(255)
+      pdf.text('TOPLAM', M + 3, yPos)
+      pdf.text(String(monthlySummary.reduce((s, m) => s + m.transactionCount, 0)), M + 35, yPos)
+      pdf.text(tlFmt(yearTotalTry), M + 55, yPos)
+      pdf.text(chfFmt(yearTotalChf), M + 105, yPos)
+      pdf.text('—', M + 140, yPos)
+      pdf.text('%100', pageWidth - M - 3, yPos, { align: 'right' })
+      yPos += 12
+
+      // === KATEGORI ANALIZI ===
+      sectionTitle('Kategori Analizi (Top 10)')
+      pdf.setFontSize(9)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(110)
+      pdf.text(`Yillik toplam ${tr(yearlyCategoryDist.length + ' kategori arasinda yer alan en yuksek 10 kalemin dagilimi.')}`, M, yPos)
+      yPos += 6
+
+      // Top 10 table
+      pdf.setFillColor(99, 102, 241)
+      pdf.rect(M, yPos - 4, pageWidth - 2 * M, 7, 'F')
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(255)
+      pdf.text('#', M + 3, yPos)
+      pdf.text('Kategori', M + 10, yPos)
+      pdf.text('TL', M + 85, yPos)
+      pdf.text('CHF', M + 130, yPos)
+      pdf.text('% Yillik', pageWidth - M - 3, yPos, { align: 'right' })
+      yPos += 7
+
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(40)
+      const top10 = yearlyCategoryDist.slice(0, 10)
+      top10.forEach((c, idx) => {
+        ensureRoom(7)
+        if (idx % 2 === 0) {
+          pdf.setFillColor(247, 248, 252)
+          pdf.rect(M, yPos - 4, pageWidth - 2 * M, 6, 'F')
+        }
+        const pct = yearTotalTry > 0 ? (c.tl / yearTotalTry) * 100 : 0
+        pdf.text(String(idx + 1), M + 3, yPos)
+        const catName = tr(c.name)
+        pdf.text(catName.length > 32 ? catName.slice(0, 30) + '...' : catName, M + 10, yPos)
+        pdf.text(tlFmt(c.tl), M + 85, yPos)
+        pdf.text(chfFmt(c.chf), M + 130, yPos)
+        pdf.text(`%${pct.toFixed(1)}`, pageWidth - M - 3, yPos, { align: 'right' })
+        yPos += 6
+      })
+      yPos += 6
+
+      // === AY-KATEGORI MATRISI (en aktif aylar icin top 5 kategori) ===
+      pdf.addPage(); yPos = 20
+      sectionTitle('Aylik Kategori Kirilimi')
+      pdf.setFontSize(9)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(110)
+      pdf.text(tr('Her aktif ay icin en yuksek 5 maliyet kategorisi ve toplam icindeki pay.'), M, yPos)
+      yPos += 8
+
+      activeMonthRows.forEach(m => {
+        ensureRoom(40)
+        subTitle(`${monthLabels[m.month]} ${year}  -  Toplam: ${tlFmt(m.totalTry)} (${chfFmt(m.totalChf)})`)
+        const top5 = m.categories.slice(0, 5)
+        top5.forEach((c, idx) => {
+          ensureRoom(6)
+          const pct = m.totalTry > 0 ? (c.amount / m.totalTry) * 100 : 0
+          // bar görünümü
+          const barX = M + 80
+          const barW = 60
+          const fillW = barW * (pct / 100)
+          pdf.setFontSize(9)
+          pdf.setFont('helvetica', 'normal')
+          pdf.setTextColor(40)
+          const catName = tr(c.name)
+          pdf.text(catName.length > 32 ? catName.slice(0, 30) + '...' : catName, M + 3, yPos)
+          pdf.text(tlFmt(c.amount), M + 50, yPos)
+          // Bar background
+          pdf.setFillColor(232, 234, 244)
+          pdf.rect(barX, yPos - 3, barW, 4, 'F')
+          pdf.setFillColor(99, 102, 241)
+          pdf.rect(barX, yPos - 3, fillW, 4, 'F')
+          pdf.setFontSize(8)
+          pdf.setTextColor(60)
+          pdf.text(`%${pct.toFixed(1)}`, pageWidth - M - 3, yPos, { align: 'right' })
+          yPos += 6
+        })
+        yPos += 4
+        hr()
+      })
+
+      // === FOOTER & SAYFA NUMARASI ===
+      const totalPages = pdf.internal.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i)
+        pdf.setFontSize(8)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor(140)
+        pdf.text(`Cxentrix Solutions  -  Logic Holding Maliyet Raporu  -  ${year}`, M, pageHeight - 8)
+        pdf.text(`Sayfa ${i} / ${totalPages}`, pageWidth - M, pageHeight - 8, { align: 'right' })
+      }
 
       pdf.save(`Cxentrix-Logic-Raporu-${year}.pdf`)
+      toast.success(`PDF indirildi (${totalPages} sayfa)`)
     } catch (err) {
       toast.error('PDF oluşturulamadı: ' + err.message)
     } finally {
