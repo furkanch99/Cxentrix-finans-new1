@@ -103,8 +103,10 @@ main .fade-in > *:nth-child(5) { animation-delay: 0.33s; }
 
 /* Card-hover class'ı için lift + glow */
 .card-hover {
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important,
-              box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important,
+  /* lightningcss multi-value transition icinde her satira ayri !important
+     kabul etmiyor; tek bir !important deklarasyonun sonunda yeterli. */
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1),
               border-color 0.2s ease !important;
   position: relative;
   overflow: hidden;
@@ -256,9 +258,10 @@ div[style*="grid-template-columns"]:not([style*="repeat"]) {
 /* ─── 7. INPUT'LAR - PREMIUM ─── */
 
 input, select, textarea {
+  /* Tek !important tum kisalt deklarasyon icin gecerli. */
   transition: border-color 0.2s ease,
               box-shadow 0.25s ease,
-              background-color 0.2s ease !important;
+              background-color 0.2s ease;
 }
 
 input:focus, select:focus, textarea:focus {
