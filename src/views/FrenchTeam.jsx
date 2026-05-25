@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Icon, fmtTL, monthName, monthFull } from '../utils'
 import { useCurrency, fmtCHF, FALLBACK_RATE } from '../CurrencyContext'
-import { fetchCommissions, addCommission, deleteCommission, getRateForDate } from '../dataService'
+import { fetchCommissions, addCommission, updateCommission, deleteCommission, getRateForDate } from '../dataService'
 import { useToast } from '../Toast'
 
 export default function FrenchTeam({ reload }) {
@@ -10,6 +10,7 @@ export default function FrenchTeam({ reload }) {
   const [commissions, setCommissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
+  const [editTarget, setEditTarget] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -112,7 +113,7 @@ export default function FrenchTeam({ reload }) {
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '120px 80px 80px 110px 110px 1fr 40px', gap: 12, padding: '10px 0', borderBottom: '2px solid var(--accent)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 600 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 80px 80px 110px 110px 1fr 72px', gap: 12, padding: '10px 0', borderBottom: '2px solid var(--accent)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 600 }}>
               <div>Ay</div>
               <div style={{ textAlign: 'center' }}>Sales</div>
               <div style={{ textAlign: 'center' }}>Retention</div>
@@ -126,7 +127,7 @@ export default function FrenchTeam({ reload }) {
               const rate = getRateAt(monthEndDate) || FALLBACK_RATE
               const tl = parseFloat(c.total_chf) * rate
               return (
-                <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '120px 80px 80px 110px 110px 1fr 40px', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--line-soft)', alignItems: 'center' }}>
+                <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '120px 80px 80px 110px 110px 1fr 72px', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--line-soft)', alignItems: 'center' }}>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>{monthFull(c.month)} {c.year}</div>
                   <div style={{ textAlign: 'center', fontSize: 12 }}>
                     <span style={{ background: 'var(--blue-soft)', color: 'var(--blue)', padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>{c.sales_count}</span>
@@ -137,8 +138,11 @@ export default function FrenchTeam({ reload }) {
                   <div className="mono" style={{ textAlign: 'right', fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{fmtCHF(c.total_chf)}</div>
                   <div className="mono" style={{ textAlign: 'right', fontSize: 12, color: 'var(--ink-muted)' }}>{fmtTL(tl)}</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{c.notes || '—'}</div>
-                  <div>
-                    <button onClick={() => handleDelete(c.id, `${monthFull(c.month)} ${c.year}`)} style={{ color: 'var(--ink-muted)', padding: 4, background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                    <button onClick={() => setEditTarget(c)} title="Düzenle" style={{ width: 26, height: 26, borderRadius: 6, color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                      <Icon name="edit" size={13}/>
+                    </button>
+                    <button onClick={() => handleDelete(c.id, `${monthFull(c.month)} ${c.year}`)} title="Sil" style={{ width: 26, height: 26, borderRadius: 6, color: 'var(--ink-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
                       <Icon name="trash" size={13}/>
                     </button>
                   </div>
@@ -150,22 +154,38 @@ export default function FrenchTeam({ reload }) {
       </div>
 
       {/* EKLEME MODAL */}
-      {showAdd && <AddCommissionModal onClose={() => setShowAdd(false)} onSuccess={async () => { await loadData(); if (reload) await reload(); setShowAdd(false) }} />}
+      {showAdd && (
+        <CommissionModal
+          mode="add"
+          onClose={() => setShowAdd(false)}
+          onSuccess={async () => { await loadData(); if (reload) await reload(); setShowAdd(false) }}
+        />
+      )}
+      {/* DÜZENLEME MODAL */}
+      {editTarget && (
+        <CommissionModal
+          mode="edit"
+          existing={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSuccess={async () => { await loadData(); if (reload) await reload(); setEditTarget(null) }}
+        />
+      )}
     </div>
   )
 }
 
-function AddCommissionModal({ onClose, onSuccess }) {
+function CommissionModal({ mode = 'add', existing = null, onClose, onSuccess }) {
   const toast = useToast()
   const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth())
-  const [salesCount, setSalesCount] = useState(0)
-  const [retentionCount, setRetentionCount] = useState(0)
+  const isEdit = mode === 'edit' && existing != null
+  const [year, setYear] = useState(isEdit ? existing.year : now.getFullYear())
+  const [month, setMonth] = useState(isEdit ? existing.month : now.getMonth())
+  const [salesCount, setSalesCount] = useState(isEdit ? existing.sales_count : 0)
+  const [retentionCount, setRetentionCount] = useState(isEdit ? existing.retention_count : 0)
   const [rate, setRate] = useState('')
   const [autoRate, setAutoRate] = useState(null)
   const [loadingRate, setLoadingRate] = useState(false)
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes] = useState(isEdit ? (existing.notes || '') : '')
   const [saving, setSaving] = useState(false)
 
   // Otomatik kur çek (ay sonu)
@@ -209,8 +229,16 @@ function AddCommissionModal({ onClose, onSuccess }) {
     }
     setSaving(true)
     try {
-      await addCommission(year, month, salesCount, retentionCount, notes, isRateManual ? rateNum : null)
-      toast.success('French Team primi eklendi')
+      if (isEdit) {
+        await updateCommission(existing.id, {
+          year, month, salesCount, retentionCount, notes,
+          manualRate: isRateManual ? rateNum : null,
+        })
+        toast.success(`${monthFull(month)} ${year} primi güncellendi`)
+      } else {
+        await addCommission(year, month, salesCount, retentionCount, notes, isRateManual ? rateNum : null)
+        toast.success('French Team primi eklendi')
+      }
       onSuccess()
     } catch (err) {
       toast.error('Hata: ' + err.message)
@@ -234,8 +262,14 @@ function AddCommissionModal({ onClose, onSuccess }) {
         width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto',
         boxShadow: 'var(--shadow-lg)'
       }}>
-        <h2 className="display gradient-text" style={{ fontSize: 22, marginBottom: 4 }}>Yeni French Team Primi</h2>
-        <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginBottom: 20 }}>Aylık prim ekle — kur otomatik gelir, istersen değiştirebilirsin</p>
+        <h2 className="display gradient-text" style={{ fontSize: 22, marginBottom: 4 }}>
+          {isEdit ? 'Primi Düzenle' : 'Yeni French Team Primi'}
+        </h2>
+        <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginBottom: 20 }}>
+          {isEdit
+            ? 'Sales / retention / kur / not değerlerini güncelle. Bağlı gider kaydı da otomatik güncellenir.'
+            : 'Aylık prim ekle — kur otomatik gelir, istersen değiştirebilirsin'}
+        </p>
 
         {/* AY VE YIL */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
@@ -338,7 +372,7 @@ function AddCommissionModal({ onClose, onSuccess }) {
             border: 'none', fontSize: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
             opacity: (saving || totalChf === 0) ? 0.6 : 1
           }}>
-            {saving ? 'Kaydediliyor...' : 'Primi Ekle'}
+            {saving ? 'Kaydediliyor...' : isEdit ? 'Değişiklikleri Kaydet' : 'Primi Ekle'}
           </button>
         </div>
       </div>

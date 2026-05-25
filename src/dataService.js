@@ -224,6 +224,56 @@ export async function addCommission(year, month, salesCount, retentionCount, not
   return data
 }
 
+export async function updateCommission(id, { year, month, salesCount, retentionCount, notes, manualRate = null }) {
+  // Mevcut kaydı çek (transaction_id'ye ulaşmak için)
+  const { data: existing, error: fetchError } = await supabase
+    .from('french_team_commissions')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (fetchError) throw fetchError
+
+  const totalChf = (salesCount * 10) + (retentionCount * 3)
+  const monthEndDate = new Date(year, month + 1, 0).toISOString().slice(0, 10)
+
+  let rateValue
+  if (manualRate && manualRate > 0) {
+    rateValue = manualRate
+  } else {
+    const rate = await getRateForDate(monthEndDate)
+    rateValue = rate ? parseFloat(rate.chf_to_try) : FALLBACK_RATE
+  }
+
+  const totalTry = totalChf * rateValue
+  const description = `French Team Primi ${monthName(month)} ${year} (${salesCount} sales + ${retentionCount} retention${manualRate ? ', manuel kur' : ''})`
+
+  // Bağlı transaction kaydını güncelle (varsa)
+  if (existing.transaction_id) {
+    const { error: txError } = await supabase
+      .from('transactions')
+      .update({
+        date: monthEndDate,
+        amount: totalTry,
+        description,
+      })
+      .eq('id', existing.transaction_id)
+    if (txError) throw txError
+  }
+
+  // Komisyon kaydını güncelle
+  const { data, error } = await supabase
+    .from('french_team_commissions')
+    .update({
+      year, month, sales_count: salesCount, retention_count: retentionCount,
+      total_chf: totalChf, notes,
+    })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
 export async function deleteCommission(id) {
   const { data: commission } = await supabase.from('french_team_commissions').select('transaction_id').eq('id', id).single()
   if (commission?.transaction_id) {
