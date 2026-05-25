@@ -817,8 +817,17 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
 
   const monthlyHakedis = useMemo(() => {
     const months = Array.from({length: 12}, (_, m) => ({
-      month: m, hakedisChf: 0, salaryChf: 0, frenchChf: 0,
-      transferTry: 0, transferChf: 0, rate: FALLBACK_RATE
+      month: m,
+      hakedisChf: 0,
+      salaryChf: 0,
+      frenchChf: 0,
+      advanceChf: 0,
+      salaryTry: 0,
+      frenchTry: 0,
+      advanceTry: 0,
+      transferTry: 0,
+      transferChf: 0,
+      rate: FALLBACK_RATE,
     }))
 
     // salaryTxs aslında fatih_monthly_salaries kayıtlarıdır:
@@ -830,7 +839,8 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
       const m = sal.month
       if (m == null || m < 0 || m > 11) return
       months[m].salaryChf += safeNumber(sal.amount_chf)
-      const rate = safeNumber(sal.chf_to_try_rate, 36)
+      months[m].salaryTry += safeNumber(sal.amount_try)
+      const rate = safeNumber(sal.chf_to_try_rate, FALLBACK_RATE)
       if (rate > 0) months[m].rate = rate
     })
 
@@ -840,6 +850,20 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
       const m = d.getMonth()
       const rate = getSafeRate(t.date)
       months[m].frenchChf += safeNumber(t.amount) / rate
+      months[m].frenchTry += safeNumber(t.amount)
+      months[m].rate = rate
+    })
+
+    // Şirket içi harcamalar (eskiden "Avans") — Fatih'in cebinden ödediği
+    // ama kategorisi şirket gideri olan işlemler. Bunlar da hakedişin
+    // parçasıdır çünkü şirket Fatih'e bu tutarı borçlanır.
+    fatihData.advanceTxs.forEach(t => {
+      const d = new Date(t.date)
+      if (d.getFullYear() !== year) return
+      const m = d.getMonth()
+      const rate = getSafeRate(t.date)
+      months[m].advanceChf += safeNumber(t.amount) / rate
+      months[m].advanceTry += safeNumber(t.amount)
       months[m].rate = rate
     })
 
@@ -854,16 +878,18 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
     })
 
     months.forEach(m => {
-      m.hakedisChf = m.salaryChf + m.frenchChf
-      m.hakedisTry = m.hakedisChf * m.rate
+      m.hakedisChf = m.salaryChf + m.frenchChf + m.advanceChf
+      m.hakedisTry = m.salaryTry + m.frenchTry + m.advanceTry
       m.kalanChf = m.hakedisChf - m.transferChf
-      m.kalanTry = m.kalanChf * m.rate
+      m.kalanTry = m.hakedisTry - m.transferTry
     })
 
     return months
   }, [fatihData, year, getSafeRate])
 
-  const activeMonths = monthlyHakedis.filter(m => m.hakedisChf > 0 || m.transferChf > 0)
+  const activeMonths = monthlyHakedis.filter(m =>
+    m.hakedisChf > 0 || m.transferChf > 0
+  )
   const monthlyHakedisChf = activeMonths.reduce((s, m) => s + m.hakedisChf, 0)
   const monthlyHakedisTry = activeMonths.reduce((s, m) => s + m.hakedisTry, 0)
 
@@ -880,6 +906,11 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
   const totalTransferChf = activeMonths.reduce((s, m) => s + m.transferChf, 0)
   const totalKalanChf = totalHakedisChf - totalTransferChf
   const totalKalanTry = totalHakedisTry - totalTransferTry
+
+  // Kırılım toplamları (Maaş / Prim / Şirket İçi Harcamalar)
+  const totalSalaryChf  = activeMonths.reduce((s, m) => s + m.salaryChf, 0)
+  const totalFrenchChf  = activeMonths.reduce((s, m) => s + m.frenchChf, 0)
+  const totalAdvanceChf = activeMonths.reduce((s, m) => s + m.advanceChf, 0)
 
   return (
     <div className="fade-in">
@@ -930,31 +961,67 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
 
       <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 20, border: '1px solid var(--line)', overflowX: 'auto' }}>
         <h3 className="display" style={{ fontSize: 15, marginBottom: 14 }}>{year} Detay Tablosu</h3>
-        <div style={{ minWidth: 1000 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 1fr 1fr 1fr 1fr 1fr 1fr', gap: 8, padding: '10px 12px', background: 'var(--gradient-1)', color: 'white', borderRadius: 8, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 8 }}>
+        <div style={{ minWidth: 1280 }}>
+          {/* Üst gruplandırma şeridi */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '100px 3fr 1.4fr 70px 1.2fr 1.2fr 1.2fr',
+            gap: 8, padding: '6px 12px 4px',
+            fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-faint)', fontWeight: 700
+          }}>
+            <div></div>
+            <div style={{ textAlign: 'center', borderBottom: '1px solid var(--line)' }}>Hakediş Kırılımı (CHF)</div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '100px 1fr 1fr 1fr 1.2fr 70px 1.2fr 1.2fr 1.2fr',
+            gap: 8, padding: '10px 12px',
+            background: 'var(--gradient-1)', color: 'white', borderRadius: 8,
+            fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 8
+          }}>
             <div>Ay</div>
-            <div style={{ textAlign: 'right' }}>Hakediş CHF</div>
-            <div style={{ textAlign: 'right' }}>Ort. Kur</div>
+            <div style={{ textAlign: 'right' }}>Maaş</div>
+            <div style={{ textAlign: 'right' }}>Prim</div>
+            <div style={{ textAlign: 'right' }}>Şirket İçi</div>
+            <div style={{ textAlign: 'right' }}>Toplam Hakediş</div>
+            <div style={{ textAlign: 'right' }}>Kur</div>
             <div style={{ textAlign: 'right' }}>Hakediş TL</div>
-            <div style={{ textAlign: 'right' }}>Çekilen TL</div>
-            <div style={{ textAlign: 'right' }}>Çekilen CHF</div>
-            <div style={{ textAlign: 'right' }}>Kalan TL</div>
-            <div style={{ textAlign: 'right' }}>Kalan CHF</div>
+            <div style={{ textAlign: 'right' }}>Çekilen</div>
+            <div style={{ textAlign: 'right' }}>Kalan</div>
           </div>
 
           {showOpeningRow && (
-            <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 1fr 1fr 1fr 1fr 1fr 1fr', gap: 8, padding: '12px 12px', background: 'var(--accent-soft)', border: '1px dashed var(--accent)', borderRadius: 6, alignItems: 'center', marginBottom: 6 }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '100px 1fr 1fr 1fr 1.2fr 70px 1.2fr 1.2fr 1.2fr',
+              gap: 8, padding: '12px 12px',
+              background: 'var(--accent-soft)', border: '1px dashed var(--accent)',
+              borderRadius: 6, alignItems: 'center', marginBottom: 6
+            }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>
                 Açılış
                 <div style={{ fontSize: 9, color: 'var(--ink-muted)', fontWeight: 400 }}>{year}</div>
               </div>
-              <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: 'var(--green)', textAlign: 'right' }}>{fmtCHF(openingChfForYear)}</div>
               <div className="mono" style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
+              <div className="mono" style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
+              <div className="mono" style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)' }}>{fmtCHF(openingChfForYear)}</div>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--ink-muted)' }}>{fmtTL(openingTryForYear)}</div>
+              </div>
+              <div className="mono" style={{ fontSize: 10, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
               <div className="mono" style={{ fontSize: 12, color: 'var(--ink-soft)', textAlign: 'right' }}>{fmtTL(openingTryForYear)}</div>
-              <div className="mono" style={{ fontSize: 12, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
-              <div className="mono" style={{ fontSize: 12, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
-              <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: 'var(--green)', textAlign: 'right' }}>{fmtTL(openingTryForYear)}</div>
-              <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', textAlign: 'right' }}>{fmtCHF(openingChfForYear)}</div>
+              <div className="mono" style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)' }}>{fmtTL(openingTryForYear)}</div>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--green)' }}>{fmtCHF(openingChfForYear)}</div>
+              </div>
             </div>
           )}
 
@@ -964,41 +1031,74 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
             </div>
           ) : (
             activeMonths.map((m, i) => (
-              <div key={m.month} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 1fr 1fr 1fr 1fr 1fr 1fr', gap: 8, padding: '12px 12px', background: i % 2 === 0 ? 'var(--bg-elevated)' : 'transparent', borderRadius: 6, alignItems: 'center', marginBottom: 2 }}>
+              <div key={m.month} style={{
+                display: 'grid',
+                gridTemplateColumns: '100px 1fr 1fr 1fr 1.2fr 70px 1.2fr 1.2fr 1.2fr',
+                gap: 8, padding: '12px 12px',
+                background: i % 2 === 0 ? 'var(--bg-elevated)' : 'transparent',
+                borderRadius: 6, alignItems: 'center', marginBottom: 2
+              }}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>
                   {monthFull(m.month)}
                   <div style={{ fontSize: 9, color: 'var(--ink-muted)', fontWeight: 400 }}>{year}</div>
                 </div>
-                <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: 'var(--green)', textAlign: 'right' }}>{fmtCHF(m.hakedisChf)}</div>
-                <div className="mono" style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'right' }}>{m.rate.toFixed(4)}</div>
+                <div className="mono" style={{ fontSize: 12, color: m.salaryChf > 0 ? 'var(--green)' : 'var(--ink-faint)', textAlign: 'right' }}>{m.salaryChf > 0 ? fmtCHF(m.salaryChf) : '—'}</div>
+                <div className="mono" style={{ fontSize: 12, color: m.frenchChf > 0 ? 'var(--blue)' : 'var(--ink-faint)', textAlign: 'right' }}>{m.frenchChf > 0 ? fmtCHF(m.frenchChf) : '—'}</div>
+                <div className="mono" style={{ fontSize: 12, color: m.advanceChf > 0 ? 'var(--amber)' : 'var(--ink-faint)', textAlign: 'right' }}>{m.advanceChf > 0 ? fmtCHF(m.advanceChf) : '—'}</div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)' }}>{fmtCHF(m.hakedisChf)}</div>
+                </div>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--ink-muted)', textAlign: 'right' }}>{m.rate.toFixed(2)}</div>
                 <div className="mono" style={{ fontSize: 12, color: 'var(--ink-soft)', textAlign: 'right' }}>{fmtTL(m.hakedisTry)}</div>
-                <div className="mono" style={{ fontSize: 12, color: 'var(--red)', textAlign: 'right' }}>{fmtTL(m.transferTry)}</div>
-                <div className="mono" style={{ fontSize: 12, color: 'var(--red)', textAlign: 'right' }}>{fmtCHF(m.transferChf)}</div>
-                <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: m.kalanTry >= 0 ? 'var(--green)' : 'var(--red)', textAlign: 'right' }}>{fmtTL(m.kalanTry)}</div>
-                <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: m.kalanChf >= 0 ? 'var(--green)' : 'var(--red)', textAlign: 'right' }}>{fmtCHF(m.kalanChf)}</div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="mono" style={{ fontSize: 12, color: m.transferTry > 0 ? 'var(--red)' : 'var(--ink-faint)' }}>{m.transferTry > 0 ? fmtTL(m.transferTry) : '—'}</div>
+                  {m.transferChf > 0 && <div className="mono" style={{ fontSize: 10, color: 'var(--red)', opacity: 0.7 }}>{fmtCHF(m.transferChf)}</div>}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: m.kalanTry >= 0 ? 'var(--green)' : 'var(--red)' }}>{fmtTL(m.kalanTry)}</div>
+                  <div className="mono" style={{ fontSize: 10, fontWeight: 700, color: m.kalanChf >= 0 ? 'var(--green)' : 'var(--red)', opacity: 0.85 }}>{fmtCHF(m.kalanChf)}</div>
+                </div>
               </div>
             ))
           )}
 
           {(activeMonths.length > 0 || showOpeningRow) && (
-            <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 1fr 1fr 1fr 1fr 1fr 1fr', gap: 8, padding: '14px 12px', background: 'var(--accent-soft)', border: '2px solid var(--accent)', borderRadius: 8, alignItems: 'center', marginTop: 8 }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '100px 1fr 1fr 1fr 1.2fr 70px 1.2fr 1.2fr 1.2fr',
+              gap: 8, padding: '14px 12px',
+              background: 'var(--accent-soft)', border: '2px solid var(--accent)',
+              borderRadius: 8, alignItems: 'center', marginTop: 8
+            }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>TOPLAM</div>
-              <div className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)', textAlign: 'right' }}>{fmtCHF(totalHakedisChf)}</div>
-              <div style={{ textAlign: 'right', fontSize: 10, color: 'var(--ink-muted)' }}>—</div>
+              <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', textAlign: 'right' }}>{fmtCHF(totalSalaryChf)}</div>
+              <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue)',  textAlign: 'right' }}>{fmtCHF(totalFrenchChf)}</div>
+              <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: 'var(--amber)', textAlign: 'right' }}>{fmtCHF(totalAdvanceChf)}</div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--green)' }}>{fmtCHF(totalHakedisChf)}</div>
+              </div>
+              <div className="mono" style={{ fontSize: 10, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
               <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-soft)', textAlign: 'right' }}>{fmtTL(totalHakedisTry)}</div>
-              <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)', textAlign: 'right' }}>{fmtTL(totalTransferTry)}</div>
-              <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)', textAlign: 'right' }}>{fmtCHF(totalTransferChf)}</div>
-              <div className="mono" style={{ fontSize: 13, fontWeight: 700, color: totalKalanTry >= 0 ? 'var(--green)' : 'var(--red)', textAlign: 'right' }}>{fmtTL(totalKalanTry)}</div>
-              <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: totalKalanChf >= 0 ? 'var(--green)' : 'var(--red)', textAlign: 'right' }}>{fmtCHF(totalKalanChf)}</div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--red)' }}>{fmtTL(totalTransferTry)}</div>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--red)', opacity: 0.7 }}>{fmtCHF(totalTransferChf)}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: totalKalanTry >= 0 ? 'var(--green)' : 'var(--red)' }}>{fmtTL(totalKalanTry)}</div>
+                <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: totalKalanChf >= 0 ? 'var(--green)' : 'var(--red)' }}>{fmtCHF(totalKalanChf)}</div>
+              </div>
             </div>
           )}
         </div>
 
         <div style={{ marginTop: 18, padding: 12, background: 'var(--bg-elevated)', borderRadius: 8, fontSize: 10, color: 'var(--ink-muted)', lineHeight: 1.7 }}>
           <strong style={{ color: 'var(--ink-soft)' }}>Açıklamalar:</strong><br/>
-          <strong>Hakediş CHF:</strong> O ayın Maaş + French Team Primi toplamı (CHF)<br/>
-          <strong>Ort. Kur:</strong> Tahakkukta kullanılan kur (manuel veya otomatik)<br/>
-          <strong>Çekilen:</strong> O ay şirketten Fatih'e yapılan transferler<br/>
+          <strong style={{ color: 'var(--green)' }}>Maaş:</strong> Tahakkuk eden aylık net maaş (CHF)<br/>
+          <strong style={{ color: 'var(--blue)' }}>Prim:</strong> French Team primi (CHF)<br/>
+          <strong style={{ color: 'var(--amber)' }}>Şirket İçi:</strong> Fatih'in cebinden ödediği şirket harcamaları (CHF)<br/>
+          <strong>Toplam Hakediş:</strong> Maaş + Prim + Şirket İçi Harcamalar<br/>
+          <strong>Kur:</strong> Tahakkukta kullanılan kur (manuel veya otomatik)<br/>
+          <strong>Çekilen:</strong> O ay şirketten Fatih'e yapılan nakit transferleri<br/>
           <strong>Kalan:</strong> Hakediş − Çekilen (sadece o ay için, birikim yok)
         </div>
       </div>
