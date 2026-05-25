@@ -153,6 +153,25 @@ create table if not exists public.fatih_monthly_salaries (
 );
 
 -- =====================================================================
+-- 11. tugba_monthly_salaries
+-- Fatih'in eşi Tuğba'ya ödenen aylık maaş. Fatih'in hakedişinden
+-- düşülür (şirketin Fatih'e olan borcunu azaltır), transactions
+-- tablosuna yansımaz.
+-- =====================================================================
+create table if not exists public.tugba_monthly_salaries (
+  id               uuid primary key default gen_random_uuid(),
+  year             int  not null,
+  month            int  not null check (month between 0 and 11),
+  amount_chf       numeric(14,2) not null,
+  amount_try       numeric(18,2) not null,
+  chf_to_try_rate  numeric(14,4) not null,
+  notes            text,
+  accrued_by       uuid references auth.users(id) on delete set null,
+  accrued_at       timestamptz not null default now(),
+  unique (year, month)
+);
+
+-- =====================================================================
 -- Row-Level Security
 --   READ : anyone (anon + authenticated) — single-tenant internal app
 --   WRITE: only authenticated users
@@ -164,7 +183,8 @@ declare
   tables text[] := array[
     'categories','payment_types','exchange_rates','transactions',
     'payment_status','audit_log','french_team_commissions',
-    'logic_report_status','fatih_settings','fatih_monthly_salaries'
+    'logic_report_status','fatih_settings','fatih_monthly_salaries',
+    'tugba_monthly_salaries'
   ];
 begin
   foreach t in array tables loop

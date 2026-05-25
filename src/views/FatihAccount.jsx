@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Icon, fmtTL, monthName, monthFull } from '../utils'
 import { useCurrency, fmtCHF, FALLBACK_RATE } from '../CurrencyContext'
-import { fetchFatihSettings, fetchFatihSalaries, accrueFatihSalary, deleteFatihSalary, getRateForDate } from '../dataService'
+import {
+  fetchFatihSettings, fetchFatihSalaries, accrueFatihSalary, deleteFatihSalary,
+  fetchTugbaSalaries, accrueTugbaSalary, deleteTugbaSalary,
+  getRateForDate,
+} from '../dataService'
 import { isFatihTransferTx } from '../fatihHelper'
 import { PaymentPieChart } from '../charts'
 import { useToast } from '../Toast'
@@ -32,8 +36,10 @@ export default function FatihAccount({ data, reload }) {
   const [tab, setTab] = useState('summary')
   const [settings, setSettings] = useState(null)
   const [salaries, setSalaries] = useState([])
+  const [tugbaSalaries, setTugbaSalaries] = useState([])
   const [loading, setLoading] = useState(true)
   const [showSalaryModal, setShowSalaryModal] = useState(false)
+  const [showTugbaModal, setShowTugbaModal] = useState(false)
   const [detailModal, setDetailModal] = useState(null)
   const [loadError, setLoadError] = useState(null)
 
@@ -45,12 +51,14 @@ export default function FatihAccount({ data, reload }) {
     setLoading(true)
     setLoadError(null)
     try {
-      const [s, sal] = await Promise.all([
+      const [s, sal, tug] = await Promise.all([
         fetchFatihSettings().catch(() => null),
-        fetchFatihSalaries().catch(() => [])
+        fetchFatihSalaries().catch(() => []),
+        fetchTugbaSalaries().catch(() => []),
       ])
       setSettings(s)
       setSalaries(Array.isArray(sal) ? sal : [])
+      setTugbaSalaries(Array.isArray(tug) ? tug : [])
     } catch (err) {
       setLoadError(err.message)
     } finally {
@@ -109,6 +117,10 @@ export default function FatihAccount({ data, reload }) {
       const salaryChfTotal = (salaries || []).reduce((s, sal) => s + safeNumber(sal.amount_chf), 0)
       const salaryTryTotal = (salaries || []).reduce((s, sal) => s + safeNumber(sal.amount_try), 0)
 
+      // Tuğba maaşı — Fatih hakedişinden düşülür
+      const tugbaChfTotal = (tugbaSalaries || []).reduce((s, sal) => s + safeNumber(sal.amount_chf), 0)
+      const tugbaTryTotal = (tugbaSalaries || []).reduce((s, sal) => s + safeNumber(sal.amount_try), 0)
+
       // French Team Primi, Şirket İçi Harcamalar, Şirket→Fatih transfer
       const frenchTryTotal   = sumTry(frenchTxs)
       const frenchChfTotal   = sumChf(frenchTxs)
@@ -134,8 +146,11 @@ export default function FatihAccount({ data, reload }) {
       //   + French Team primleri
       //   + Şirket içi harcamalar (Fatih'in cebinden)
       //   - Şirketten Fatih'e yapılan transferler
-      const totalChf = openingBalanceChf + salaryChfTotal + frenchChfTotal + advanceChfTotal - transferChfTotal
-      const totalTry = openingBalanceTry + salaryTryTotal + frenchTryTotal + advanceTryTotal - transferTryTotal
+      //   - Tuğba Karakaş maaşı (Fatih hakedişinden düşülür)
+      const totalChf = openingBalanceChf + salaryChfTotal + frenchChfTotal + advanceChfTotal
+                       - transferChfTotal - tugbaChfTotal
+      const totalTry = openingBalanceTry + salaryTryTotal + frenchTryTotal + advanceTryTotal
+                       - transferTryTotal - tugbaTryTotal
 
       return {
         initialTry: 0,
@@ -145,6 +160,9 @@ export default function FatihAccount({ data, reload }) {
         salaryTxs: salaries || [],
         salaryTry: salaryTryTotal,
         salaryChf: salaryChfTotal,
+        tugbaTxs: tugbaSalaries || [],
+        tugbaTry: tugbaTryTotal,
+        tugbaChf: tugbaChfTotal,
         frenchTxs,
         frenchTry: frenchTryTotal,
         frenchChf: frenchChfTotal,
@@ -162,7 +180,7 @@ export default function FatihAccount({ data, reload }) {
       console.error(err)
       return null
     }
-  }, [data, settings, salaries, getSafeRate])
+  }, [data, settings, salaries, tugbaSalaries, getSafeRate])
 
   const handleDeleteSalary = async (id) => {
     if (!confirm('Bu maaş tahakkukunu silmek istediğine emin misin? İlişkili gider de silinecek.')) return
@@ -171,6 +189,18 @@ export default function FatihAccount({ data, reload }) {
       await loadData()
       if (reload) await reload()
       toast.success('Maaş tahakkuku silindi')
+    } catch (err) {
+      toast.error('Hata: ' + err.message)
+    }
+  }
+
+  const handleDeleteTugba = async (id) => {
+    if (!confirm('Bu Tuğba maaş kaydını silmek istediğine emin misin?')) return
+    try {
+      await deleteTugbaSalary(id)
+      await loadData()
+      if (reload) await reload()
+      toast.success('Tuğba maaş kaydı silindi')
     } catch (err) {
       toast.error('Hata: ' + err.message)
     }
@@ -233,8 +263,11 @@ export default function FatihAccount({ data, reload }) {
           fatihData={fatihData}
           settings={settings}
           salaries={salaries}
+          tugbaSalaries={tugbaSalaries}
           onAddSalary={() => setShowSalaryModal(true)}
+          onAddTugba={() => setShowTugbaModal(true)}
           handleDeleteSalary={handleDeleteSalary}
+          handleDeleteTugba={handleDeleteTugba}
           setDetailModal={setDetailModal}
         />
       ) : (
@@ -254,12 +287,19 @@ export default function FatihAccount({ data, reload }) {
           onSuccess={async () => { await loadData(); if (reload) await reload(); setShowSalaryModal(false) }}
         />
       )}
+      {showTugbaModal && (
+        <AccrueTugbaModal
+          existingSalaries={tugbaSalaries}
+          onClose={() => setShowTugbaModal(false)}
+          onSuccess={async () => { await loadData(); if (reload) await reload(); setShowTugbaModal(false) }}
+        />
+      )}
     </div>
   )
 }
 
 // ============= CARI HESAP GÖRÜNÜMÜ =============
-function SummaryView({ fatihData, settings, salaries, onAddSalary, handleDeleteSalary, setDetailModal }) {
+function SummaryView({ fatihData, settings, salaries, tugbaSalaries, onAddSalary, onAddTugba, handleDeleteSalary, handleDeleteTugba, setDetailModal }) {
   const isPositive = fatihData.balanceTry > 0
   const isNegative = fatihData.balanceTry < 0
   const salaryAmount = safeNumber(settings.monthly_salary_chf, 4000)
@@ -297,7 +337,7 @@ function SummaryView({ fatihData, settings, salaries, onAddSalary, handleDeleteS
         </div>
       </div>
 
-      {/* MAAŞ EKLE BUTONU */}
+      {/* MAAŞ EKLE BUTONLARI */}
       <div style={{
         background: 'var(--bg-card)', border: '1px solid var(--line)',
         borderRadius: 12, padding: '14px 18px', marginBottom: 20,
@@ -305,22 +345,32 @@ function SummaryView({ fatihData, settings, salaries, onAddSalary, handleDeleteS
       }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Maaş Tahakkuk Etme</div>
-          <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>İstediğin ay için CHF ve kur değerlerini elle girerek maaş ekle</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>Aylık olarak Fatih veya Tuğba'nın maaşını elle gir</div>
         </div>
-        <button onClick={onAddSalary} style={{
-          background: 'var(--gradient-1)', color: 'white', padding: '9px 16px',
-          borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-          border: 'none', display: 'flex', alignItems: 'center', gap: 6
-        }}>
-          <Icon name="plus" size={13}/> Yeni Maaş Ekle
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={onAddSalary} style={{
+            background: 'var(--gradient-1)', color: 'white', padding: '9px 16px',
+            borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            border: 'none', display: 'flex', alignItems: 'center', gap: 6
+          }}>
+            <Icon name="plus" size={13}/> Fatih Maaşı Ekle
+          </button>
+          <button onClick={onAddTugba} style={{
+            background: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)', color: 'white',
+            padding: '9px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            border: 'none', display: 'flex', alignItems: 'center', gap: 6
+          }}>
+            <Icon name="plus" size={13}/> Tuğba Maaşı Ekle
+          </button>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
         <ClickableCard label="Toplam Maaş" value={fmtCHF(fatihData.salaryChf)} subtitle={`${fatihData.salaryTxs.length} ay · ${fmtTL(fatihData.salaryTry)}`} color="green" icon="users" onClick={() => setDetailModal({ type: 'salary', title: 'Maaş Tahakkukları', txs: fatihData.salaryTxs, color: 'var(--green)' })} />
         <ClickableCard label="French Team Primi" value={fmtCHF(fatihData.frenchChf)} subtitle={`${fatihData.frenchTxs.length} kayıt · ${fmtTL(fatihData.frenchTry)}`} color="blue" icon="spark" onClick={() => setDetailModal({ type: 'french', title: 'French Team Primi', txs: fatihData.frenchTxs, color: 'var(--blue)' })} />
         <ClickableCard label="Şirket → Fatih Transfer" value={fmtCHF(fatihData.transferChf)} subtitle={`${fatihData.transferTxs.length} işlem · ${fmtTL(fatihData.transferTry)}`} color="red" icon="arrowDown" onClick={() => setDetailModal({ type: 'transfer', title: 'Şirket → Fatih Transferleri', txs: fatihData.transferTxs, color: 'var(--red)' })} />
         <ClickableCard label="Şirket İçi Harcamalar" value={fmtCHF(fatihData.advanceChf)} subtitle={`${fatihData.advanceTxs.length} işlem · ${fmtTL(fatihData.advanceTry)}`} color="amber" icon="arrowUp" onClick={() => setDetailModal({ type: 'advance', title: 'Şirket İçi Harcamalar', txs: fatihData.advanceTxs, color: 'var(--amber)' })} />
+        <ClickableCard label="Tuğba Maaşı" value={fmtCHF(fatihData.tugbaChf)} subtitle={`${fatihData.tugbaTxs.length} ay · ${fmtTL(fatihData.tugbaTry)}`} color="red" icon="users" onClick={() => setDetailModal({ type: 'tugba', title: 'Tuğba Karakaş Maaşları', txs: fatihData.tugbaTxs, color: '#f43f5e' })} />
       </div>
 
       {/* Donut + Bakiye Hesabı yan yana */}
@@ -338,6 +388,7 @@ function SummaryView({ fatihData, settings, salaries, onAddSalary, handleDeleteS
             <Row label="+ French Team Primleri" chf={fatihData.frenchChf} tl={fatihData.frenchTry} sign="+" color="var(--blue)" />
             <Row label="+ Şirket İçi Harcamalar" chf={fatihData.advanceChf} tl={fatihData.advanceTry} sign="+" color="var(--amber)" />
             <Row label="− Şirket → Fatih Transferleri" chf={fatihData.transferChf} tl={fatihData.transferTry} sign="−" color="var(--red)" />
+            <Row label="− Tuğba Karakaş Maaşı" chf={fatihData.tugbaChf} tl={fatihData.tugbaTry} sign="−" color="#f43f5e" />
             <div style={{ borderTop: '2px solid var(--accent)', marginTop: 8, paddingTop: 12 }}>
               <Row label="MEVCUT BAKİYE" chf={fatihData.balanceChf} tl={fatihData.balanceTry} sign="" color={isPositive ? 'var(--green)' : isNegative ? 'var(--red)' : 'var(--ink)'} bold />
             </div>
@@ -348,11 +399,13 @@ function SummaryView({ fatihData, settings, salaries, onAddSalary, handleDeleteS
       {/* Son hareketler timeline */}
       <RecentActivityPanel fatihData={fatihData} />
 
-      {/* Sekmeli detay paneli: Maaş / Prim / Transfer / Şirket İçi Harcamalar */}
+      {/* Sekmeli detay paneli: Maaş / Prim / Transfer / Şirket İçi / Tuğba */}
       <GroupedDetailPanel
         fatihData={fatihData}
         salaries={salaries}
+        tugbaSalaries={tugbaSalaries}
         handleDeleteSalary={handleDeleteSalary}
+        handleDeleteTugba={handleDeleteTugba}
       />
     </div>
   )
@@ -375,9 +428,10 @@ function BalanceDonut({ data }) {
   return (
     <div>
       <PaymentPieChart data={slices} />
-      <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-muted)', textAlign: 'center' }}>
+      <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-muted)', textAlign: 'center', lineHeight: 1.6 }}>
         Toplam alacak: <strong style={{ color: 'var(--ink)' }} className="mono">{fmtTL(total)}</strong>
         {data.transferTry > 0 && <span> · Çekilen: <strong style={{ color: 'var(--red)' }} className="mono">{fmtTL(data.transferTry)}</strong></span>}
+        {data.tugbaTry > 0 && <span> · Tuğba: <strong style={{ color: '#f43f5e' }} className="mono">{fmtTL(data.tugbaTry)}</strong></span>}
       </div>
     </div>
   )
@@ -426,6 +480,20 @@ function RecentActivityPanel({ fatihData }) {
         sign: '−', color: 'var(--red)', icon: 'arrowDown',
       })
     })
+    fatihData.tugbaTxs.forEach(s => {
+      // Tuğba maaşı kayıtlarında tarih `date` yerine `year+month` üzerinden hesaplanır
+      const d = (s.year != null && s.month != null)
+        ? `${s.year}-${String(s.month + 1).padStart(2, '0')}-01`
+        : null
+      if (!d) return
+      all.push({
+        kind: 'tugba', date: d,
+        amount_try: safeNumber(s.amount_try),
+        amount_chf: safeNumber(s.amount_chf),
+        label: `${monthFull(s.month)} ${s.year} Tuğba maaşı${s.notes ? ' — ' + s.notes : ''}`,
+        sign: '−', color: '#f43f5e', icon: 'users',
+      })
+    })
     return all.sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 15)
   }, [fatihData])
 
@@ -461,7 +529,7 @@ function RecentActivityPanel({ fatihData }) {
 }
 
 // ============= SEKMELİ DETAY PANELİ =============
-function GroupedDetailPanel({ fatihData, salaries, handleDeleteSalary }) {
+function GroupedDetailPanel({ fatihData, salaries, tugbaSalaries, handleDeleteSalary, handleDeleteTugba }) {
   const [tab, setTab] = useState('salary')
 
   const tabs = [
@@ -469,6 +537,7 @@ function GroupedDetailPanel({ fatihData, salaries, handleDeleteSalary }) {
     { key: 'french',   label: 'Primler',     count: fatihData.frenchTxs.length, color: 'var(--blue)' },
     { key: 'transfer', label: 'Transferler', count: fatihData.transferTxs.length, color: 'var(--red)' },
     { key: 'advance',  label: 'Şirket İçi Harcamalar', count: fatihData.advanceTxs.length, color: 'var(--amber)' },
+    { key: 'tugba',    label: 'Tuğba Maaşı', count: tugbaSalaries.length, color: '#f43f5e' },
   ]
 
   return (
@@ -524,6 +593,27 @@ function GroupedDetailPanel({ fatihData, salaries, handleDeleteSalary }) {
         fatihData.advanceTxs.length === 0
           ? <EmptyState text="Henüz şirket içi harcama yok."/>
           : <TxTable txs={fatihData.advanceTxs} color="var(--amber)" />
+      )}
+      {tab === 'tugba' && (
+        tugbaSalaries.length === 0
+          ? <EmptyState text="Henüz Tuğba maaş kaydı yok."/>
+          : <SimpleTable
+              cols={['120px', '1fr', '120px', '130px', '130px', '40px']}
+              headers={['Ay', 'Kur', 'CHF', 'TL', 'Not', '']}
+              rows={tugbaSalaries.map(s => ({
+                key: s.id,
+                cells: [
+                  <span style={{ fontWeight: 500 }}>{monthFull(s.month)} {s.year}</span>,
+                  <span style={{ color: 'var(--ink-muted)' }}>1 CHF = {safeNumber(s.chf_to_try_rate).toFixed(4)}</span>,
+                  <span className="mono" style={{ textAlign: 'right', fontWeight: 600, color: '#f43f5e' }}>{fmtCHF(safeNumber(s.amount_chf))}</span>,
+                  <span className="mono" style={{ textAlign: 'right', color: 'var(--ink-soft)' }}>{fmtTL(safeNumber(s.amount_try))}</span>,
+                  <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{s.notes || '—'}</span>,
+                  <button onClick={() => handleDeleteTugba(s.id)} style={{ color: 'var(--ink-muted)', padding: 4, background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                    <Icon name="trash" size={13}/>
+                  </button>,
+                ],
+              }))}
+            />
       )}
     </div>
   )
@@ -801,6 +891,207 @@ function AccrueSalaryModal({ settings, existingSalaries, onClose, onSuccess }) {
   )
 }
 
+// ============= TUĞBA MAAŞ TAHAKKUK MODALI =============
+function AccrueTugbaModal({ existingSalaries, onClose, onSuccess }) {
+  const modalToast = useToast()
+  const now = new Date()
+  const [year, setYear] = useState(now.getFullYear())
+  const [month, setMonth] = useState(now.getMonth())
+  const [salaryChf, setSalaryChf] = useState('')
+  const [rate, setRate] = useState('')
+  const [autoRate, setAutoRate] = useState(null)
+  const [loadingRate, setLoadingRate] = useState(false)
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const isAlreadyAccrued = useMemo(() => {
+    return existingSalaries.some(s => s.year === year && s.month === month)
+  }, [existingSalaries, year, month])
+
+  useEffect(() => {
+    const fetchAutoRate = async () => {
+      setLoadingRate(true)
+      try {
+        const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
+        const rateData = await getRateForDate(monthStart)
+        if (rateData && rateData.chf_to_try) {
+          const v = parseFloat(rateData.chf_to_try)
+          setAutoRate(v)
+          setRate(v.toFixed(4))
+        } else {
+          setAutoRate(null)
+          setRate(String(FALLBACK_RATE))
+        }
+      } catch {
+        setAutoRate(null)
+        setRate(String(FALLBACK_RATE))
+      } finally {
+        setLoadingRate(false)
+      }
+    }
+    fetchAutoRate()
+  }, [year, month])
+
+  const salaryNum = parseFloat(salaryChf) || 0
+  const rateNum = parseFloat(rate) || 0
+  const totalTry = salaryNum * rateNum
+  const isRateManual = autoRate !== null && Math.abs(rateNum - autoRate) > 0.001
+
+  const handleSave = async () => {
+    if (isAlreadyAccrued) {
+      modalToast.error(`${monthFull(month)} ${year} için Tuğba maaşı zaten kayıtlı.`)
+      return
+    }
+    if (salaryNum <= 0) {
+      modalToast.error('Geçerli bir maaş tutarı girin (CHF).')
+      return
+    }
+    if (rateNum <= 0) {
+      modalToast.error('Geçerli bir kur girin.')
+      return
+    }
+    if (!confirm(`${monthFull(month)} ${year} için Tuğba'ya ${salaryNum} CHF maaş kaydedilecek.\nKur: 1 CHF = ${rateNum.toFixed(4)} TL\nToplam: ${fmtTL(totalTry)}\nFatih hakedişinden düşülecek.\n\nOnaylıyor musun?`)) return
+
+    setSaving(true)
+    try {
+      await accrueTugbaSalary(year, month, salaryNum, isRateManual ? rateNum : null, notes.trim() || null)
+      modalToast.success(`${monthFull(month)} ${year} Tuğba maaşı kaydedildi`)
+      onSuccess()
+    } catch (err) {
+      modalToast.error('Hata: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(15, 17, 23, 0.6)',
+      backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 100, padding: 20
+    }}>
+      <div onClick={e => e.stopPropagation()} className="fade-in" style={{
+        background: 'var(--bg-card)', borderRadius: 16, padding: 28,
+        width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto',
+        boxShadow: 'var(--shadow-lg)'
+      }}>
+        <div style={{ marginBottom: 4 }}>
+          <h2 className="display" style={{ fontSize: 22, color: '#f43f5e' }}>Tuğba Karakaş Maaşı</h2>
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginBottom: 20 }}>
+          Bu maaş Fatih'in hakedişinden düşülür — şirketin Fatih'e olan borcunu azaltır
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>Yıl</label>
+            <select value={year} onChange={e => setYear(Number(e.target.value))} style={{ width: '100%', padding: '10px 12px', fontSize: 13 }}>
+              {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>Ay</label>
+            <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ width: '100%', padding: '10px 12px', fontSize: 13 }}>
+              {Array.from({length: 12}, (_, i) => <option key={i} value={i}>{monthFull(i)}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {isAlreadyAccrued && (
+          <div style={{
+            background: 'var(--red-soft)', border: '1px solid var(--red)',
+            borderRadius: 8, padding: '8px 12px', marginBottom: 14,
+            fontSize: 11, color: 'var(--red)', fontWeight: 600
+          }}>
+            ⚠ {monthFull(month)} {year} için Tuğba maaşı zaten kayıtlı. Önce eski kaydı silin.
+          </div>
+        )}
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>Maaş Tutarı (CHF)</label>
+          <input
+            type="number" step="0.01" min="0"
+            value={salaryChf}
+            onChange={e => setSalaryChf(e.target.value)}
+            placeholder="örn. 1500.00"
+            style={{
+              width: '100%', padding: '10px 12px', fontSize: 14,
+              fontFamily: "'JetBrains Mono', monospace", fontWeight: 600,
+              border: '1px solid var(--line)', background: 'var(--bg-input)'
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>
+            <span>CHF → TL Kuru {isRateManual && <span style={{ background: 'var(--amber)', color: 'white', padding: '2px 6px', borderRadius: 4, marginLeft: 6, letterSpacing: 'normal', textTransform: 'none' }}>MANUEL</span>}</span>
+            {autoRate && isRateManual && (
+              <button onClick={() => setRate(autoRate.toFixed(4))} style={{ background: 'transparent', border: 'none', color: 'var(--accent)', fontSize: 10, cursor: 'pointer', textTransform: 'none', letterSpacing: 'normal' }}>
+                ↶ Otomatik Kura Dön ({autoRate.toFixed(4)})
+              </button>
+            )}
+          </label>
+          <input
+            type="number" step="0.0001" min="0"
+            value={rate}
+            onChange={e => setRate(e.target.value)}
+            placeholder={loadingRate ? 'Yükleniyor...' : String(FALLBACK_RATE)}
+            style={{
+              width: '100%', padding: '10px 12px', fontSize: 14,
+              fontFamily: "'JetBrains Mono', monospace", fontWeight: 600,
+              border: isRateManual ? '2px solid var(--amber)' : '1px solid var(--line)',
+              background: isRateManual ? 'var(--amber-soft, #fef3c7)' : 'var(--bg-input)'
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>Not (Opsiyonel)</label>
+          <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Açıklama, ödeme tipi vs."
+            style={{ width: '100%', padding: '10px 12px', fontSize: 13 }}
+          />
+        </div>
+
+        <div style={{
+          background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244, 63, 94, 0.35)',
+          borderRadius: 12, padding: '14px 16px', marginBottom: 18
+        }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#f43f5e', fontWeight: 700, marginBottom: 8 }}>Hesaplama</div>
+          <div style={{ display: 'grid', gap: 6, fontSize: 13 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--ink-muted)' }}>Tuğba maaşı</span>
+              <span className="mono" style={{ color: '#f43f5e', fontWeight: 700 }}>{salaryNum.toFixed(2)} CHF</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--ink-muted)' }}>Kur</span>
+              <span className="mono">1 CHF = {rateNum.toFixed(4)} TL</span>
+            </div>
+            <div style={{ borderTop: '1px solid rgba(244, 63, 94, 0.3)', paddingTop: 6, display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 15 }}>
+              <span>TL Karşılığı</span>
+              <span className="mono" style={{ color: '#f43f5e' }}>{fmtTL(totalTry)}</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'right' }}>
+              Fatih hakedişinden bu tutar düşülecek
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '10px 18px', borderRadius: 8, background: 'var(--bg-input)', border: '1px solid var(--line)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>İptal</button>
+          <button onClick={handleSave} disabled={saving || isAlreadyAccrued || salaryNum <= 0 || rateNum <= 0} style={{
+            padding: '10px 20px', borderRadius: 8,
+            background: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)', color: 'white',
+            border: 'none', fontSize: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
+            opacity: (saving || isAlreadyAccrued || salaryNum <= 0 || rateNum <= 0) ? 0.5 : 1
+          }}>
+            {saving ? 'Kaydediliyor...' : 'Tuğba Maaşını Kaydet'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ============= HAKEDİŞ TABLOSU =============
 function HakedisView({ fatihData, settings, getSafeRate }) {
   const [year, setYear] = useState(new Date().getFullYear())
@@ -809,6 +1100,7 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
     const ys = new Set()
     // Maaş kayıtlarında tarih `date` yerine `year` alanında.
     fatihData.salaryTxs.forEach(s => { if (s.year != null) ys.add(s.year) })
+    fatihData.tugbaTxs.forEach(s => { if (s.year != null) ys.add(s.year) })
     fatihData.frenchTxs.forEach(t => { const y = new Date(t.date).getFullYear(); if (!isNaN(y)) ys.add(y) })
     fatihData.transferTxs.forEach(t => { const y = new Date(t.date).getFullYear(); if (!isNaN(y)) ys.add(y) })
     ys.add(new Date().getFullYear())
@@ -827,6 +1119,8 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
       advanceTry: 0,
       transferTry: 0,
       transferChf: 0,
+      tugbaChf: 0,
+      tugbaTry: 0,
       rate: FALLBACK_RATE,
     }))
 
@@ -877,18 +1171,29 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
       months[m].rate = rate
     })
 
+    // Tuğba maaşları — fatih_monthly_salaries ile aynı yapıda (year+month)
+    fatihData.tugbaTxs.forEach(s => {
+      if (s.year !== year) return
+      const m = s.month
+      if (m == null || m < 0 || m > 11) return
+      months[m].tugbaChf += safeNumber(s.amount_chf)
+      months[m].tugbaTry += safeNumber(s.amount_try)
+      const rate = safeNumber(s.chf_to_try_rate, FALLBACK_RATE)
+      if (rate > 0) months[m].rate = rate
+    })
+
     months.forEach(m => {
       m.hakedisChf = m.salaryChf + m.frenchChf + m.advanceChf
       m.hakedisTry = m.salaryTry + m.frenchTry + m.advanceTry
-      m.kalanChf = m.hakedisChf - m.transferChf
-      m.kalanTry = m.hakedisTry - m.transferTry
+      m.kalanChf = m.hakedisChf - m.transferChf - m.tugbaChf
+      m.kalanTry = m.hakedisTry - m.transferTry - m.tugbaTry
     })
 
     return months
   }, [fatihData, year, getSafeRate])
 
   const activeMonths = monthlyHakedis.filter(m =>
-    m.hakedisChf > 0 || m.transferChf > 0
+    m.hakedisChf > 0 || m.transferChf > 0 || m.tugbaChf > 0
   )
   const monthlyHakedisChf = activeMonths.reduce((s, m) => s + m.hakedisChf, 0)
   const monthlyHakedisTry = activeMonths.reduce((s, m) => s + m.hakedisTry, 0)
@@ -904,13 +1209,15 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
   const totalHakedisTry = monthlyHakedisTry + openingTryForYear
   const totalTransferTry = activeMonths.reduce((s, m) => s + m.transferTry, 0)
   const totalTransferChf = activeMonths.reduce((s, m) => s + m.transferChf, 0)
-  const totalKalanChf = totalHakedisChf - totalTransferChf
-  const totalKalanTry = totalHakedisTry - totalTransferTry
+  const totalKalanChf = totalHakedisChf - totalTransferChf - totalTugbaChf
+  const totalKalanTry = totalHakedisTry - totalTransferTry - totalTugbaTry
 
   // Kırılım toplamları (Maaş / Prim / Şirket İçi Harcamalar)
   const totalSalaryChf  = activeMonths.reduce((s, m) => s + m.salaryChf, 0)
   const totalFrenchChf  = activeMonths.reduce((s, m) => s + m.frenchChf, 0)
   const totalAdvanceChf = activeMonths.reduce((s, m) => s + m.advanceChf, 0)
+  const totalTugbaTry   = activeMonths.reduce((s, m) => s + m.tugbaTry, 0)
+  const totalTugbaChf   = activeMonths.reduce((s, m) => s + m.tugbaChf, 0)
 
   return (
     <div className="fade-in">
@@ -961,7 +1268,7 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
 
       <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 20, border: '1px solid var(--line)', overflowX: 'auto' }}>
         <h3 className="display" style={{ fontSize: 15, marginBottom: 14 }}>{year} Detay Tablosu</h3>
-        <div style={{ minWidth: 1280 }}>
+        <div style={{ minWidth: 1420 }}>
           {/* Üst gruplandırma şeridi */}
           <div style={{
             display: 'grid',
@@ -980,7 +1287,7 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
 
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '100px 1fr 1fr 1fr 1.2fr 70px 1.2fr 1.2fr 1.2fr',
+            gridTemplateColumns: '100px 1fr 1fr 1fr 1.2fr 70px 1.2fr 1fr 1fr 1.2fr',
             gap: 8, padding: '10px 12px',
             background: 'var(--gradient-1)', color: 'white', borderRadius: 8,
             fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 8
@@ -993,13 +1300,14 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
             <div style={{ textAlign: 'right' }}>Kur</div>
             <div style={{ textAlign: 'right' }}>Hakediş TL</div>
             <div style={{ textAlign: 'right' }}>Çekilen</div>
+            <div style={{ textAlign: 'right' }}>Tuğba</div>
             <div style={{ textAlign: 'right' }}>Kalan</div>
           </div>
 
           {showOpeningRow && (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '100px 1fr 1fr 1fr 1.2fr 70px 1.2fr 1.2fr 1.2fr',
+              gridTemplateColumns: '100px 1fr 1fr 1fr 1.2fr 70px 1.2fr 1fr 1fr 1.2fr',
               gap: 8, padding: '12px 12px',
               background: 'var(--accent-soft)', border: '1px dashed var(--accent)',
               borderRadius: 6, alignItems: 'center', marginBottom: 6
@@ -1018,6 +1326,7 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
               <div className="mono" style={{ fontSize: 10, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
               <div className="mono" style={{ fontSize: 12, color: 'var(--ink-soft)', textAlign: 'right' }}>{fmtTL(openingTryForYear)}</div>
               <div className="mono" style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
+              <div className="mono" style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'right' }}>—</div>
               <div style={{ textAlign: 'right' }}>
                 <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)' }}>{fmtTL(openingTryForYear)}</div>
                 <div className="mono" style={{ fontSize: 10, color: 'var(--green)' }}>{fmtCHF(openingChfForYear)}</div>
@@ -1033,7 +1342,7 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
             activeMonths.map((m, i) => (
               <div key={m.month} style={{
                 display: 'grid',
-                gridTemplateColumns: '100px 1fr 1fr 1fr 1.2fr 70px 1.2fr 1.2fr 1.2fr',
+                gridTemplateColumns: '100px 1fr 1fr 1fr 1.2fr 70px 1.2fr 1fr 1fr 1.2fr',
                 gap: 8, padding: '12px 12px',
                 background: i % 2 === 0 ? 'var(--bg-elevated)' : 'transparent',
                 borderRadius: 6, alignItems: 'center', marginBottom: 2
@@ -1055,6 +1364,10 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
                   {m.transferChf > 0 && <div className="mono" style={{ fontSize: 10, color: 'var(--red)', opacity: 0.7 }}>{fmtCHF(m.transferChf)}</div>}
                 </div>
                 <div style={{ textAlign: 'right' }}>
+                  <div className="mono" style={{ fontSize: 12, color: m.tugbaTry > 0 ? '#f43f5e' : 'var(--ink-faint)' }}>{m.tugbaTry > 0 ? fmtTL(m.tugbaTry) : '—'}</div>
+                  {m.tugbaChf > 0 && <div className="mono" style={{ fontSize: 10, color: '#f43f5e', opacity: 0.7 }}>{fmtCHF(m.tugbaChf)}</div>}
+                </div>
+                <div style={{ textAlign: 'right' }}>
                   <div className="mono" style={{ fontSize: 12, fontWeight: 600, color: m.kalanTry >= 0 ? 'var(--green)' : 'var(--red)' }}>{fmtTL(m.kalanTry)}</div>
                   <div className="mono" style={{ fontSize: 10, fontWeight: 700, color: m.kalanChf >= 0 ? 'var(--green)' : 'var(--red)', opacity: 0.85 }}>{fmtCHF(m.kalanChf)}</div>
                 </div>
@@ -1065,7 +1378,7 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
           {(activeMonths.length > 0 || showOpeningRow) && (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '100px 1fr 1fr 1fr 1.2fr 70px 1.2fr 1.2fr 1.2fr',
+              gridTemplateColumns: '100px 1fr 1fr 1fr 1.2fr 70px 1.2fr 1fr 1fr 1.2fr',
               gap: 8, padding: '14px 12px',
               background: 'var(--accent-soft)', border: '2px solid var(--accent)',
               borderRadius: 8, alignItems: 'center', marginTop: 8
@@ -1084,6 +1397,10 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
                 <div className="mono" style={{ fontSize: 10, color: 'var(--red)', opacity: 0.7 }}>{fmtCHF(totalTransferChf)}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
+                <div className="mono" style={{ fontSize: 13, fontWeight: 700, color: '#f43f5e' }}>{fmtTL(totalTugbaTry)}</div>
+                <div className="mono" style={{ fontSize: 10, color: '#f43f5e', opacity: 0.7 }}>{fmtCHF(totalTugbaChf)}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
                 <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: totalKalanTry >= 0 ? 'var(--green)' : 'var(--red)' }}>{fmtTL(totalKalanTry)}</div>
                 <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: totalKalanChf >= 0 ? 'var(--green)' : 'var(--red)' }}>{fmtCHF(totalKalanChf)}</div>
               </div>
@@ -1099,7 +1416,8 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
           <strong>Toplam Hakediş:</strong> Maaş + Prim + Şirket İçi Harcamalar<br/>
           <strong>Kur:</strong> Tahakkukta kullanılan kur (manuel veya otomatik)<br/>
           <strong>Çekilen:</strong> O ay şirketten Fatih'e yapılan nakit transferleri<br/>
-          <strong>Kalan:</strong> Hakediş − Çekilen (sadece o ay için, birikim yok)
+          <strong style={{ color: '#f43f5e' }}>Tuğba:</strong> O ay Tuğba Karakaş'a ödenen maaş (hakedişten düşülür)<br/>
+          <strong>Kalan:</strong> Hakediş − Çekilen − Tuğba (sadece o ay için, birikim yok)
         </div>
       </div>
     </div>
@@ -1141,9 +1459,40 @@ function ClickableCard({ label, value, subtitle, color, icon, onClick }) {
 }
 
 function DetailModal({ modal, onClose, getSafeRate }) {
-  const sorted = [...modal.txs].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-  const totalTl = sorted.reduce((s, t) => s + safeNumber(t.amount), 0)
-  const totalChf = sorted.reduce((s, t) => s + (safeNumber(t.amount) / getSafeRate(t.date)), 0)
+  // Bazı kalemler transaction değil aylık maaş kaydı (year+month+amount_try)
+  // formatında geliyor. Hem onları hem klasik transaction'ları doğru
+  // gösterebilmek için tek bir görüntüleme şekline normalize ediyoruz.
+  const isMonthlyRow = (t) =>
+    t && t.year != null && t.month != null && (t.amount_try != null || t.amount_chf != null)
+
+  const normalizeRow = (t) => {
+    if (isMonthlyRow(t)) {
+      const date = `${t.year}-${String(t.month + 1).padStart(2, '0')}-01`
+      const tl = safeNumber(t.amount_try)
+      const chf = safeNumber(t.amount_chf)
+      return {
+        id: t.id,
+        date,
+        amountTl: tl,
+        amountChf: chf,
+        description: `${monthFull(t.month)} ${t.year} maaşı${t.notes ? ' — ' + t.notes : ''}`,
+      }
+    }
+    const rate = getSafeRate(t.date)
+    const amt = safeNumber(t.amount)
+    return {
+      id: t.id,
+      date: t.date,
+      amountTl: amt,
+      amountChf: rate > 0 ? amt / rate : 0,
+      description: t.description || '—',
+    }
+  }
+
+  const rows = modal.txs.map(normalizeRow)
+  const sorted = [...rows].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  const totalTl = sorted.reduce((s, r) => s + r.amountTl, 0)
+  const totalChf = sorted.reduce((s, r) => s + r.amountChf, 0)
 
   return (
     <div onClick={onClose} style={{
@@ -1176,16 +1525,14 @@ function DetailModal({ modal, onClose, getSafeRate }) {
               <div style={{ textAlign: 'right' }}>CHF</div>
               <div style={{ textAlign: 'right' }}>TL</div>
             </div>
-            {sorted.map((tx, i) => {
-              const rate = getSafeRate(tx.date)
-              const amt = safeNumber(tx.amount)
-              const d = safeDate(tx.date)
+            {sorted.map((r, i) => {
+              const d = safeDate(r.date)
               return (
-                <div key={tx.id || i} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 130px 130px', gap: 12, padding: '10px 0', alignItems: 'center', borderBottom: i < sorted.length - 1 ? '1px solid var(--line-soft)' : 'none' }}>
+                <div key={r.id || i} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 130px 130px', gap: 12, padding: '10px 0', alignItems: 'center', borderBottom: i < sorted.length - 1 ? '1px solid var(--line-soft)' : 'none' }}>
                   <div className="mono" style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{d ? d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</div>
-                  <div style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.description || '—'}</div>
-                  <div className="mono" style={{ fontSize: 12, textAlign: 'right', color: 'var(--ink-muted)' }}>{fmtCHF(amt / rate)}</div>
-                  <div className="mono" style={{ fontSize: 13, fontWeight: 600, textAlign: 'right', color: modal.color }}>{fmtTL(amt)}</div>
+                  <div style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description}>{r.description}</div>
+                  <div className="mono" style={{ fontSize: 12, textAlign: 'right', color: 'var(--ink-muted)' }}>{fmtCHF(r.amountChf)}</div>
+                  <div className="mono" style={{ fontSize: 13, fontWeight: 600, textAlign: 'right', color: modal.color }}>{fmtTL(r.amountTl)}</div>
                 </div>
               )
             })}

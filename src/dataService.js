@@ -378,6 +378,58 @@ export async function deleteFatihSalary(id) {
   if (error) throw error
 }
 
+// === TUĞBA MAAŞI (Fatih hakedişinden düşülür) ===
+export async function fetchTugbaSalaries() {
+  const { data, error } = await supabase
+    .from('tugba_monthly_salaries')
+    .select('*')
+    .order('year', { ascending: false })
+    .order('month', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function accrueTugbaSalary(year, month, salaryChf, manualRate = null, notes = null) {
+  const user = (await supabase.auth.getUser()).data.user
+  const { data: existing } = await supabase
+    .from('tugba_monthly_salaries')
+    .select('*')
+    .eq('year', year).eq('month', month).maybeSingle()
+  if (existing) throw new Error(`${monthName(month)} ${year} için Tuğba maaşı zaten girilmiş.`)
+
+  const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
+
+  let rateValue
+  if (manualRate && manualRate > 0) {
+    rateValue = manualRate
+  } else {
+    const rate = await getRateForDate(monthStart)
+    rateValue = rate ? parseFloat(rate.chf_to_try) : FALLBACK_RATE
+  }
+
+  const totalTry = salaryChf * rateValue
+
+  const { data, error } = await supabase
+    .from('tugba_monthly_salaries')
+    .insert({
+      year, month,
+      amount_chf: salaryChf,
+      amount_try: totalTry,
+      chf_to_try_rate: rateValue,
+      notes,
+      accrued_by: user?.id,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteTugbaSalary(id) {
+  const { error } = await supabase.from('tugba_monthly_salaries').delete().eq('id', id)
+  if (error) throw error
+}
+
 // === ÖDEME DURUMU ===
 export async function fetchPaymentStatuses() {
   const { data, error } = await supabase.from('payment_status').select('*')
