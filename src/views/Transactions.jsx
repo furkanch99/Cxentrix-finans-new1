@@ -99,15 +99,6 @@ export default function Transactions({ data, reload }) {
 
   return (
     <div>
-      <div style={{
-        background: 'var(--accent-soft)', border: '1px solid var(--accent)',
-        borderRadius: 10, padding: '10px 14px', marginBottom: 12,
-        fontSize: 11, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 8
-      }}>
-        <Icon name="spark" size={13} />
-        <span>French Team Primi kayıtları gizlidir — French Team Primi sayfasından yönetebilirsin. Düzenlemek için <strong>kalem ikonu</strong>, silmek için <strong>çöp ikonu</strong>.</span>
-      </div>
-
       <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 2, background: 'var(--bg-card)', padding: 3, borderRadius: 10, border: '1px solid var(--line)' }}>
           {['all','income','expense'].map(f => (

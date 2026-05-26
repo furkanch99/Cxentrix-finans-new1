@@ -357,9 +357,7 @@ export default function Reports({ data }) {
         <select value={year} onChange={e => setYear(Number(e.target.value))} style={{ padding: '8px 14px', fontSize: 13, fontWeight: 500 }}>
           {years.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
-        <div style={{ fontSize: 11, color: 'var(--ink-muted)', flex: 1, minWidth: 200 }}>
-          Fatih Karakaş cari hesap hareketleri rapora dahil edilmemiştir
-        </div>
+        <div style={{ flex: 1 }} />
         <button
           onClick={handleExportPDF}
           disabled={exportingPdf || yearTxs.length === 0}

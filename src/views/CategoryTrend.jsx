@@ -112,10 +112,7 @@ export default function CategoryTrend({ data }) {
       </div>
 
       <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 22, border: '1px solid var(--line)', marginBottom: 16 }}>
-        <h3 className="display" style={{ fontSize: 15, marginBottom: 4 }}>{monthFull(month1)} vs {monthFull(month2)} — Kategori Karşılaştırması</h3>
-        <p style={{ fontSize: 11, color: 'var(--ink-muted)', marginBottom: 14 }}>
-          {type === 'expense' ? 'Gider' : 'Gelir'} kategorileri için ay bazlı değişim. {type === 'expense' && 'Fatih Karakaş cari hesap hareketleri dahil değildir.'}
-        </p>
+        <h3 className="display" style={{ fontSize: 15, marginBottom: 14 }}>{monthFull(month1)} vs {monthFull(month2)} — Kategori Karşılaştırması</h3>
         {comparison.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-muted)', fontSize: 13 }}>Bu dönemler için veri yok.</div>
         ) : (

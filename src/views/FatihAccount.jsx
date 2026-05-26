@@ -308,16 +308,6 @@ function SummaryView({ fatihData, settings, salaries, tugbaSalaries, onAddSalary
 
   return (
     <div className="fade-in">
-      <div style={{
-        background: 'var(--accent-soft)', border: '1px solid var(--accent)',
-        borderRadius: 12, padding: '12px 16px', marginBottom: 18,
-        display: 'flex', alignItems: 'flex-start', gap: 12
-      }}>
-        <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--accent)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>FK</div>
-        <div style={{ fontSize: 12, color: 'var(--ink)', lineHeight: 1.5 }}>
-          <strong>Fatih Karakaş Cari Hesabı:</strong> Başlangıç bakiyesi <strong className="mono">{fmtCHF(fatihData.openingBalanceChf)} ({fmtTL(fatihData.openingBalanceTry)})</strong> · {settingsDateStr} itibarıyla. Aylık maaş varsayılan: <strong>{salaryAmount} CHF</strong>. Kartlara tıklayarak detayları görebilirsin.
-        </div>
-      </div>
 
       <div className="glow-card" style={{
         background: isPositive ? 'var(--gradient-1)' : isNegative ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'var(--bg-card)',
@@ -1227,16 +1217,12 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
     <div className="fade-in">
       <div style={{
         background: 'linear-gradient(135deg, #1a1f2e 0%, #2d3548 100%)',
-        color: 'white', borderRadius: 14, padding: '20px 24px', marginBottom: 18,
+        color: 'white', borderRadius: 14, padding: '18px 24px', marginBottom: 18,
         position: 'relative', overflow: 'hidden'
       }}>
         <div style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, transparent 70%)' }}/>
         <div style={{ position: 'relative' }}>
-          <div style={{ fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase', opacity: 0.7, fontWeight: 600, marginBottom: 6 }}>
-            Aylık Hakediş Tablosu
-          </div>
-          <h2 className="display" style={{ fontSize: 22, marginBottom: 4 }}>Ay Bazlı Detaylı Hesap</h2>
-          <p style={{ fontSize: 12, opacity: 0.75 }}>Her ay için hakediş, çekilen, kalan tutar — TL ve CHF bazında</p>
+          <h2 className="display" style={{ fontSize: 22 }}>Aylık Hakediş Tablosu</h2>
         </div>
       </div>
 
@@ -1412,17 +1398,6 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
           )}
         </div>
 
-        <div style={{ marginTop: 18, padding: 12, background: 'var(--bg-elevated)', borderRadius: 8, fontSize: 10, color: 'var(--ink-muted)', lineHeight: 1.7 }}>
-          <strong style={{ color: 'var(--ink-soft)' }}>Açıklamalar:</strong><br/>
-          <strong style={{ color: 'var(--green)' }}>Maaş:</strong> Tahakkuk eden aylık net maaş (CHF)<br/>
-          <strong style={{ color: 'var(--blue)' }}>Prim:</strong> French Team primi (CHF)<br/>
-          <strong style={{ color: 'var(--amber)' }}>Şirket İçi:</strong> Fatih'in cebinden ödediği şirket harcamaları (CHF)<br/>
-          <strong>Toplam Hakediş:</strong> Maaş + Prim + Şirket İçi Harcamalar<br/>
-          <strong>Kur:</strong> Tahakkukta kullanılan kur (manuel veya otomatik)<br/>
-          <strong>Çekilen:</strong> O ay şirketten Fatih'e yapılan nakit transferleri<br/>
-          <strong style={{ color: '#f43f5e' }}>Tuğba:</strong> O ay Tuğba Karakaş'a ödenen maaş (hakedişten düşülür)<br/>
-          <strong>Kalan:</strong> Hakediş − Çekilen − Tuğba (sadece o ay için, birikim yok)
-        </div>
       </div>
     </div>
   )

@@ -137,13 +137,12 @@ export default function Dashboard({ data }) {
         )}
         <div style={{ marginLeft: month === 'all' ? 'auto' : 0, fontSize: 11, color: 'var(--ink-muted)' }}>
           <span style={{ color: 'var(--ink)', fontWeight: 600 }}>{periodLabel}</span> · {periodTxs.length} işlem
-          <div style={{ fontSize: 9, marginTop: 2, opacity: 0.7 }}>Fatih Karakaş cari hareketleri hariç</div>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 14 }}>
         <KPICard label="Toplam Gelir" value={fmtTL(totalIncome)} icon="trending" color="green" big Icon={Icon} />
-        <KPICard label="Toplam Gider" value={fmtTL(totalExpense)} subtitle="Fatih cari hesabı hariç" icon="wallet" color="red" big Icon={Icon} />
+        <KPICard label="Toplam Gider" value={fmtTL(totalExpense)} icon="wallet" color="red" big Icon={Icon} />
         <KPICard label="Net Kar" value={fmtTL(netProfit)} subtitle={`Kar marjı: %${profitMargin.toFixed(1)}`} icon="spark" gradient big Icon={Icon} />
       </div>
 

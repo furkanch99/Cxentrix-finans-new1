@@ -414,7 +414,6 @@ export default function LogicView({ data }) {
             Logic Holding · Yönetici Raporları
           </div>
           <h2 className="display" style={{ fontSize: 28, marginBottom: 4, lineHeight: 1.1 }}>Cxentrix Solutions Maliyet Analizi</h2>
-          <p style={{ fontSize: 12, opacity: 0.7 }}>Aylık kurları ayarlamak için → <strong>Ayarlar → Aylık Kurlar</strong></p>
         </div>
         <button onClick={handleExportPDF} disabled={exportingPdf} style={{
           background: 'rgba(255,255,255,0.95)', color: '#1a1f2e',
@@ -481,14 +480,6 @@ export default function LogicView({ data }) {
       )}
       {view === 'trend' && (
         <div className="fade-in">
-          <div style={{
-            background: 'var(--accent-soft)', border: '1px solid var(--accent)',
-            borderRadius: 10, padding: '10px 14px', marginBottom: 14,
-            fontSize: 11, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 8
-          }}>
-            <Icon name="trending" size={13} />
-            <span>Logic kapsamında Cxentrix maliyet kategorilerinin ay bazlı karşılaştırması. Fatih Karakaş cari hareketleri dahil değildir.</span>
-          </div>
           <CategoryTrend data={data} />
         </div>
       )}
@@ -525,10 +516,7 @@ function YearlyView({ year, monthlySummary, yearTotalTry, yearTotalChf, activeMo
       </div>
 
       <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 22, border: '1px solid var(--line)' }}>
-        <h3 className="display" style={{ fontSize: 17, marginBottom: 4 }}>Aylık Detay Tablosu</h3>
-        <p style={{ fontSize: 11, color: 'var(--ink-muted)', marginBottom: 16 }}>
-          Aya tıkla → kategoriler aç. Kategoriye tıkla → işlemleri gör.
-        </p>
+        <h3 className="display" style={{ fontSize: 17, marginBottom: 16 }}>Aylık Detay Tablosu</h3>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {monthlySummary.filter(m => m.totalTry > 0).map(m => {

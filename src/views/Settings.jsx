@@ -288,10 +288,6 @@ function FatihSettings() {
         </div>
       </div>
 
-      <div style={{ background: 'var(--accent-soft)', borderRadius: 10, padding: 14, marginBottom: 16, fontSize: 12, color: 'var(--ink)', lineHeight: 1.5 }}>
-        <strong>Mantık:</strong> Başlangıç bakiyesi belirlediğin tarihten itibaren Fatih'in alacağı tutarı temsil eder. Her ay "Maaşı Tahakkuk Ettir" butonuna basarsan otomatik olarak gider olarak işlenir ve bakiyeye eklenir. French Team primi ayrı bir sayfada ve bakiyeyi otomatik etkiler.
-      </div>
-
       <button onClick={handleSave} disabled={saving} style={{ background: 'var(--gradient-1)', color: 'white', padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
         {saving ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
       </button>

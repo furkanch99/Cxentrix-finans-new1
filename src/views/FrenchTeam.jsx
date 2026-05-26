@@ -62,20 +62,6 @@ export default function FrenchTeam({ reload }) {
 
   return (
     <div>
-      <div style={{
-        background: 'var(--accent-soft)', border: '1px solid var(--accent)',
-        borderRadius: 12, padding: '12px 16px', marginBottom: 18,
-        display: 'flex', alignItems: 'flex-start', gap: 12
-      }}>
-        <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--accent)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Icon name="spark" size={13}/>
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--ink)', lineHeight: 1.5 }}>
-          <strong>French Team Primi:</strong> Sales × 10 CHF + Retention × 3 CHF formülü ile aylık prim hesaplanır.
-          Otomatik kur dolu gelir, <strong>istersen elden değiştirebilirsin</strong>. Prim Fatih cari hesabına eklenir.
-        </div>
-      </div>
-
       {/* YILLIK ÖZET */}
       {yearlyStats.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(yearlyStats.length, 4)}, 1fr)`, gap: 12, marginBottom: 18 }}>

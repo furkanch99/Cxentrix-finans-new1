@@ -112,14 +112,6 @@ export default function LogicReport({ data }) {
         </div>
       </div>
 
-      {/* Bilgi kartı */}
-      <div style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent)', borderRadius: 12, padding: '12px 16px', marginBottom: 18, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--accent)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, fontWeight: 700 }}>L</div>
-        <div style={{ fontSize: 12, color: 'var(--ink)', lineHeight: 1.5 }}>
-          <strong>Logic Holding Aylık Maliyet Raporu:</strong> Bu sayfada her ay için Cxentrix'in toplam giderleri özetlenir. Logic Holding tüm masrafları karşıladığı için bu rapordaki toplam, Logic'in o ay için Cxentrix'e ödemesi gereken miktardır.
-        </div>
-      </div>
-
       {/* Üst KPI - Büyük gösterge */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
         <div className="glow-card" style={{
