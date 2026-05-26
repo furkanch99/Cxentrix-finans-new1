@@ -897,7 +897,7 @@ function AccrueTugbaModal({ existingSalaries, onClose, onSuccess }) {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
-  const [salaryChf, setSalaryChf] = useState('')
+  const [salaryTry, setSalaryTry] = useState('')  // TL olarak giriş
   const [rate, setRate] = useState('')
   const [autoRate, setAutoRate] = useState(null)
   const [loadingRate, setLoadingRate] = useState(false)
@@ -932,9 +932,9 @@ function AccrueTugbaModal({ existingSalaries, onClose, onSuccess }) {
     fetchAutoRate()
   }, [year, month])
 
-  const salaryNum = parseFloat(salaryChf) || 0
+  const totalTry = parseFloat(salaryTry) || 0
   const rateNum = parseFloat(rate) || 0
-  const totalTry = salaryNum * rateNum
+  const salaryChf = rateNum > 0 ? totalTry / rateNum : 0
   const isRateManual = autoRate !== null && Math.abs(rateNum - autoRate) > 0.001
 
   const handleSave = async () => {
@@ -942,19 +942,20 @@ function AccrueTugbaModal({ existingSalaries, onClose, onSuccess }) {
       modalToast.error(`${monthFull(month)} ${year} için Tuğba maaşı zaten kayıtlı.`)
       return
     }
-    if (salaryNum <= 0) {
-      modalToast.error('Geçerli bir maaş tutarı girin (CHF).')
+    if (totalTry <= 0) {
+      modalToast.error('Geçerli bir maaş tutarı girin (TL).')
       return
     }
     if (rateNum <= 0) {
       modalToast.error('Geçerli bir kur girin.')
       return
     }
-    if (!confirm(`${monthFull(month)} ${year} için Tuğba'ya ${salaryNum} CHF maaş kaydedilecek.\nKur: 1 CHF = ${rateNum.toFixed(4)} TL\nToplam: ${fmtTL(totalTry)}\nFatih hakedişinden düşülecek.\n\nOnaylıyor musun?`)) return
+    if (!confirm(`${monthFull(month)} ${year} için Tuğba'ya ${fmtTL(totalTry)} maaş kaydedilecek.\nKur: 1 CHF = ${rateNum.toFixed(4)} TL\nCHF karşılığı: ${salaryChf.toFixed(2)} CHF\nFatih hakedişinden düşülecek.\n\nOnaylıyor musun?`)) return
 
     setSaving(true)
     try {
-      await accrueTugbaSalary(year, month, salaryNum, isRateManual ? rateNum : null, notes.trim() || null)
+      // accrueTugbaSalary CHF bekliyor; TL/kur'dan CHF'i geçiyoruz.
+      await accrueTugbaSalary(year, month, salaryChf, isRateManual ? rateNum : null, notes.trim() || null)
       modalToast.success(`${monthFull(month)} ${year} Tuğba maaşı kaydedildi`)
       onSuccess()
     } catch (err) {
@@ -1008,18 +1009,21 @@ function AccrueTugbaModal({ existingSalaries, onClose, onSuccess }) {
         )}
 
         <div style={{ marginBottom: 14 }}>
-          <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>Maaş Tutarı (CHF)</label>
+          <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>Maaş Tutarı (TL)</label>
           <input
             type="number" step="0.01" min="0"
-            value={salaryChf}
-            onChange={e => setSalaryChf(e.target.value)}
-            placeholder="örn. 1500.00"
+            value={salaryTry}
+            onChange={e => setSalaryTry(e.target.value)}
+            placeholder="örn. 81000.00"
             style={{
               width: '100%', padding: '10px 12px', fontSize: 14,
               fontFamily: "'JetBrains Mono', monospace", fontWeight: 600,
               border: '1px solid var(--line)', background: 'var(--bg-input)'
             }}
           />
+          <div style={{ fontSize: 10, color: 'var(--ink-muted)', marginTop: 4 }}>
+            Tuğba'ya o ay TL cinsinden ödenen tutarı gir — CHF karşılığı kura göre otomatik hesaplanır
+          </div>
         </div>
 
         <div style={{ marginBottom: 14 }}>
@@ -1058,17 +1062,17 @@ function AccrueTugbaModal({ existingSalaries, onClose, onSuccess }) {
         }}>
           <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#f43f5e', fontWeight: 700, marginBottom: 8 }}>Hesaplama</div>
           <div style={{ display: 'grid', gap: 6, fontSize: 13 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--ink-muted)' }}>Tuğba maaşı</span>
-              <span className="mono" style={{ color: '#f43f5e', fontWeight: 700 }}>{salaryNum.toFixed(2)} CHF</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 15 }}>
+              <span>Tuğba maaşı</span>
+              <span className="mono" style={{ color: '#f43f5e' }}>{fmtTL(totalTry)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--ink-muted)' }}>Kur</span>
               <span className="mono">1 CHF = {rateNum.toFixed(4)} TL</span>
             </div>
-            <div style={{ borderTop: '1px solid rgba(244, 63, 94, 0.3)', paddingTop: 6, display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 15 }}>
-              <span>TL Karşılığı</span>
-              <span className="mono" style={{ color: '#f43f5e' }}>{fmtTL(totalTry)}</span>
+            <div style={{ borderTop: '1px solid rgba(244, 63, 94, 0.3)', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--ink-muted)' }}>CHF karşılığı</span>
+              <span className="mono" style={{ color: 'var(--ink-soft)' }}>{salaryChf.toFixed(2)} CHF</span>
             </div>
             <div style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'right' }}>
               Fatih hakedişinden bu tutar düşülecek
@@ -1078,11 +1082,11 @@ function AccrueTugbaModal({ existingSalaries, onClose, onSuccess }) {
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={{ padding: '10px 18px', borderRadius: 8, background: 'var(--bg-input)', border: '1px solid var(--line)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>İptal</button>
-          <button onClick={handleSave} disabled={saving || isAlreadyAccrued || salaryNum <= 0 || rateNum <= 0} style={{
+          <button onClick={handleSave} disabled={saving || isAlreadyAccrued || totalTry <= 0 || rateNum <= 0} style={{
             padding: '10px 20px', borderRadius: 8,
             background: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)', color: 'white',
             border: 'none', fontSize: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
-            opacity: (saving || isAlreadyAccrued || salaryNum <= 0 || rateNum <= 0) ? 0.5 : 1
+            opacity: (saving || isAlreadyAccrued || totalTry <= 0 || rateNum <= 0) ? 0.5 : 1
           }}>
             {saving ? 'Kaydediliyor...' : 'Tuğba Maaşını Kaydet'}
           </button>
