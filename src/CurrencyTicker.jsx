@@ -1,6 +1,76 @@
 import React, { useState, useEffect } from 'react'
 import { Icon } from './utils'
 
+// =====================================================================
+// Inline SVG bayraklar — Windows default font'unda country flag
+// emoji'leri yok. Aynı bayrakların her OS'ta tutarlı görünmesi için
+// küçük SVG bileşenleri kullanıyoruz.
+// =====================================================================
+const FLAG_W = 22, FLAG_H = 15
+const flagWrapStyle = { borderRadius: 3, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(0,0,0,0.08)', display: 'inline-block', lineHeight: 0, flexShrink: 0 }
+
+function FlagUS() {
+  return (
+    <span style={flagWrapStyle}>
+      <svg width={FLAG_W} height={FLAG_H} viewBox="0 0 24 16" xmlns="http://www.w3.org/2000/svg">
+        <rect width="24" height="16" fill="#b22234"/>
+        <g fill="#fff">
+          {[1, 3, 5, 7, 9, 11].map(i => (
+            <rect key={i} y={(i * 16) / 13} width="24" height={16 / 13}/>
+          ))}
+        </g>
+        <rect width="9.6" height={(7 * 16) / 13} fill="#3c3b6e"/>
+      </svg>
+    </span>
+  )
+}
+
+function FlagEU() {
+  // 12 yıldız simgesi yerine basit altın daire dizilimi
+  const dots = Array.from({ length: 12 }, (_, i) => {
+    const angle = (i / 12) * 2 * Math.PI - Math.PI / 2
+    return { cx: 12 + 5.2 * Math.cos(angle), cy: 8 + 5.2 * Math.sin(angle) }
+  })
+  return (
+    <span style={flagWrapStyle}>
+      <svg width={FLAG_W} height={FLAG_H} viewBox="0 0 24 16" xmlns="http://www.w3.org/2000/svg">
+        <rect width="24" height="16" fill="#003399"/>
+        <g fill="#ffcc00">
+          {dots.map((d, i) => <circle key={i} cx={d.cx} cy={d.cy} r="0.8"/>)}
+        </g>
+      </svg>
+    </span>
+  )
+}
+
+function FlagGB() {
+  return (
+    <span style={flagWrapStyle}>
+      <svg width={FLAG_W} height={FLAG_H} viewBox="0 0 60 30" xmlns="http://www.w3.org/2000/svg">
+        <clipPath id="t"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath>
+        <rect width="60" height="30" fill="#012169"/>
+        <path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" strokeWidth="6"/>
+        <path d="M0,0 L60,30 M60,0 L0,30" clipPath="url(#t)" stroke="#c8102e" strokeWidth="4"/>
+        <path d="M30,0 v30 M0,15 h60" stroke="#fff" strokeWidth="10"/>
+        <path d="M30,0 v30 M0,15 h60" stroke="#c8102e" strokeWidth="6"/>
+      </svg>
+    </span>
+  )
+}
+
+function FlagCH() {
+  // İsviçre bayrağı tabi ki kare; ufak letterbox tolere edip aynı boy
+  return (
+    <span style={flagWrapStyle}>
+      <svg width={FLAG_H} height={FLAG_H} viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+        <rect width="32" height="32" fill="#da291c"/>
+        <rect x="13" y="6" width="6" height="20" fill="#fff"/>
+        <rect x="6" y="13" width="20" height="6" fill="#fff"/>
+      </svg>
+    </span>
+  )
+}
+
 export default function CurrencyTicker() {
   const [rates, setRates] = useState([])
   const [loading, setLoading] = useState(true)
@@ -23,10 +93,10 @@ export default function CurrencyTicker() {
         // İstediğimiz dövizler için TRY karşılığı hesapla
         // API TRY -> X şeklinde veriyor, biz X -> TRY için 1/rate alıyoruz
         const newRates = [
-          { code: 'USD', symbol: '$', name: 'Dolar', rate: 1 / data.rates.USD, flag: '🇺🇸' },
-          { code: 'EUR', symbol: '€', name: 'Euro', rate: 1 / data.rates.EUR, flag: '🇪🇺' },
-          { code: 'GBP', symbol: '£', name: 'Sterlin', rate: 1 / data.rates.GBP, flag: '🇬🇧' },
-          { code: 'CHF', symbol: '₣', name: 'İsviçre Frangı', rate: 1 / data.rates.CHF, flag: '🇨🇭' },
+          { code: 'USD', symbol: '$', name: 'Dolar',          rate: 1 / data.rates.USD, Flag: FlagUS },
+          { code: 'EUR', symbol: '€', name: 'Euro',           rate: 1 / data.rates.EUR, Flag: FlagEU },
+          { code: 'GBP', symbol: '£', name: 'Sterlin',        rate: 1 / data.rates.GBP, Flag: FlagGB },
+          { code: 'CHF', symbol: '₣', name: 'İsviçre Frangı', rate: 1 / data.rates.CHF, Flag: FlagCH },
         ]
 
         // Önceki değerlerle karşılaştır - trend hesaplaması için
@@ -115,12 +185,13 @@ export default function CurrencyTicker() {
         {tickerItems.map((rate, i) => {
           const isUp = rate.change > 0
           const isDown = rate.change < 0
+          const Flag = rate.Flag
           return (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', gap: 10,
               flexShrink: 0
             }}>
-              <span style={{ fontSize: 14 }}>{rate.flag}</span>
+              {Flag && <Flag />}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{
                   fontSize: 11, fontWeight: 700, color: 'var(--ink-muted)',
