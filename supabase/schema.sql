@@ -52,6 +52,7 @@ create table if not exists public.transactions (
   installment_group_id   uuid,
   installment_no         int,
   installment_total      int,
+  checked                boolean not null default false,
   created_by             uuid references auth.users(id) on delete set null,
   created_at             timestamptz not null default now()
 );

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Icon, fmt, fmtTL, todayStr, monthFull } from '../utils'
-import { deleteTransaction, deleteInstallmentGroup, updateTransaction } from '../dataService'
+import { deleteTransaction, deleteInstallmentGroup, updateTransaction, setTransactionChecked } from '../dataService'
 import { useToast } from '../Toast'
 import EmptyState from '../EmptyState'
 
@@ -37,6 +37,26 @@ export default function Transactions({ data, reload }) {
   const [editTx, setEditTx] = useState(null)
   const [sortBy, setSortBy] = useState('date')   // 'date' | 'amount' | 'category'
   const [sortDir, setSortDir] = useState('desc') // 'asc' | 'desc'
+  // Optimistic "checked" override — DB güncellemesi sırasında tıklamanın
+  // ekranda anında yansıması için yerel olarak tutuluyor.
+  const [checkedOverride, setCheckedOverride] = useState({})
+
+  const isChecked = (tx) => (tx.id in checkedOverride) ? checkedOverride[tx.id] : !!tx.checked
+
+  const handleToggleChecked = async (tx) => {
+    const next = !isChecked(tx)
+    setCheckedOverride(p => ({ ...p, [tx.id]: next }))
+    try {
+      await setTransactionChecked(tx.id, next)
+    } catch (err) {
+      setCheckedOverride(p => {
+        const c = { ...p }
+        delete c[tx.id]
+        return c
+      })
+      toast.error('Güncellenemedi: ' + err.message)
+    }
+  }
 
   const toggleSort = (col) => {
     if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -157,7 +177,7 @@ export default function Transactions({ data, reload }) {
       const s = String(v ?? '')
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
     }
-    const headers = ['Tarih', 'Tip', 'Kategori', 'Açıklama', 'Müşteri', 'Ödeme Tipi', 'Tutar TL', 'Taksit']
+    const headers = ['Tarih', 'Tip', 'Kategori', 'Açıklama', 'Müşteri', 'Ödeme Tipi', 'Tutar TL', 'Taksit', 'Kontrol']
     const rows = list.map(t => [
       t.date,
       t.type === 'income' ? 'Gelir' : 'Gider',
@@ -167,6 +187,7 @@ export default function Transactions({ data, reload }) {
       t.paymentType || '',
       t.amount,
       t.installmentGroupId ? `${t.installmentNo}/${t.installmentTotal}` : '',
+      isChecked(t) ? 'EVET' : '',
     ])
     const csv = '﻿' + [headers, ...rows].map(r => r.map(esc).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
@@ -187,10 +208,28 @@ export default function Transactions({ data, reload }) {
       <style>{`
         .tx-row { transition: background 0.15s ease, transform 0.15s ease; }
         .tx-row:hover { background: var(--bg-elevated); }
+        .tx-row-checked { background: rgba(16, 185, 129, 0.04); }
+        .tx-row-checked:hover { background: rgba(16, 185, 129, 0.08); }
         .tx-delete-btn { transition: color 0.15s ease, background 0.15s ease; }
         .tx-delete-btn:hover { color: var(--red) !important; background: rgba(239, 68, 68, 0.10) !important; }
         .tx-edit-btn:hover { background: var(--accent-soft) !important; }
         .tx-quick-chip:hover { background: var(--accent-soft) !important; color: var(--accent) !important; }
+        .tx-check-box {
+          width: 22px; height: 22px; border-radius: 6px;
+          border: 1.5px solid var(--line);
+          background: var(--bg-input);
+          cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          transition: all 0.15s ease;
+          color: transparent;
+        }
+        .tx-check-box:hover { border-color: var(--green); background: rgba(16, 185, 129, 0.08); }
+        .tx-check-box-on {
+          background: linear-gradient(135deg, #10b981, #059669) !important;
+          border-color: #059669 !important;
+          color: white !important;
+          box-shadow: 0 1px 3px rgba(16, 185, 129, 0.35);
+        }
       `}</style>
 
       {/* TEK BARLI TOOLBAR */}
@@ -350,7 +389,7 @@ export default function Transactions({ data, reload }) {
       ) : (
       <div style={{ background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--line)', overflow: 'hidden' }}>
         {/* Sıralanabilir başlık */}
-        <div style={{ display: 'grid', gridTemplateColumns: '4px 36px 80px 1fr 150px 130px 130px 60px', gap: 10, padding: '10px 18px', alignItems: 'center', borderBottom: '1px solid var(--line)', background: 'var(--bg-elevated)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '4px 36px 80px 1fr 150px 130px 130px 60px 38px', gap: 10, padding: '10px 18px', alignItems: 'center', borderBottom: '1px solid var(--line)', background: 'var(--bg-elevated)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700 }}>
           <div></div>
           <div></div>
           <SortHeader label="Tarih"    col="date"     sortBy={sortBy} sortDir={sortDir} onClick={() => toggleSort('date')} />
@@ -359,6 +398,7 @@ export default function Transactions({ data, reload }) {
           <div>Ödeme</div>
           <SortHeader label="Tutar"    col="amount"   sortBy={sortBy} sortDir={sortDir} onClick={() => toggleSort('amount')} align="right" />
           <div></div>
+          <div style={{ textAlign: 'center' }}>Tık</div>
         </div>
 
         {list.map((tx, i) => {
@@ -367,9 +407,10 @@ export default function Transactions({ data, reload }) {
           const stripe = isIncome ? 'var(--green)' : 'var(--red)'
           const txYear = new Date(tx.date).getFullYear()
           const showYear = txYear !== currentYear
+          const checked = isChecked(tx)
           return (
-            <div key={tx.id} className="tx-row" style={{
-              display: 'grid', gridTemplateColumns: '4px 36px 80px 1fr 150px 130px 130px 60px',
+            <div key={tx.id} className={`tx-row ${checked ? 'tx-row-checked' : ''}`} style={{
+              display: 'grid', gridTemplateColumns: '4px 36px 80px 1fr 150px 130px 130px 60px 38px',
               gap: 10, padding: '12px 18px', alignItems: 'center',
               borderBottom: i < list.length - 1 ? '1px solid var(--line-soft)' : 'none'
             }}>
@@ -442,13 +483,23 @@ export default function Transactions({ data, reload }) {
                   <Icon name="trash" size={13}/>
                 </button>
               </div>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <button
+                  onClick={() => handleToggleChecked(tx)}
+                  title={checked ? 'Kontrol işaretini kaldır' : 'Kontrol edildi olarak işaretle'}
+                  aria-label={checked ? 'Kontrol işaretini kaldır' : 'Kontrol edildi olarak işaretle'}
+                  className={`tx-check-box ${checked ? 'tx-check-box-on' : ''}`}
+                >
+                  <Icon name="check" size={13} />
+                </button>
+              </div>
             </div>
           )
         })}
 
         {/* Toplam satırı — filtrelenmiş seçimin gelir/gider/net özeti */}
         <div style={{
-          display: 'grid', gridTemplateColumns: '4px 36px 80px 1fr 150px 130px 130px 60px',
+          display: 'grid', gridTemplateColumns: '4px 36px 80px 1fr 150px 130px 130px 60px 38px',
           gap: 10, padding: '14px 18px', alignItems: 'center',
           background: 'var(--accent-soft)', borderTop: '2px solid var(--accent)',
           fontSize: 12, fontWeight: 700
@@ -462,6 +513,7 @@ export default function Transactions({ data, reload }) {
           <div className="mono" style={{ fontSize: 13, fontWeight: 700, textAlign: 'right', color: totals.net >= 0 ? 'var(--green)' : 'var(--red)' }}>
             {totals.net >= 0 ? '+' : '−'}{fmtTL(Math.abs(totals.net))}
           </div>
+          <div></div>
           <div></div>
         </div>
       </div>

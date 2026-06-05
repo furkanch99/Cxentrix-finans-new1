@@ -20,7 +20,18 @@ export async function fetchTransactions() {
     installmentGroupId: t.installment_group_id || null,
     installmentNo: t.installment_no || null,
     installmentTotal: t.installment_total || null,
+    checked: !!t.checked,
   }))
+}
+
+// İşlemin "kontrol edildi" bayrağını günceller — UI tarafından
+// optimistic olarak değiştirilen tek alandır.
+export async function setTransactionChecked(id, checked) {
+  const { error } = await supabase
+    .from('transactions')
+    .update({ checked: !!checked })
+    .eq('id', id)
+  if (error) throw error
 }
 
 export async function addTransaction(tx) {
