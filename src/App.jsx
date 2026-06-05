@@ -109,6 +109,17 @@ function AppInner({ session }) {
     }
   }
 
+  // Tekil bir işlemi yerel state'te güncellemek için yardımcı.
+  // Tüm listeyi yeniden çekmek yerine sadece o satırı patch eder —
+  // alt component'ler (mesela tık değişikliği) bunu kullanır ki
+  // sekme değişip geri dönüldüğünde güncel değer hâlâ görünür.
+  const patchTransaction = (id, patch) => {
+    setData(d => ({
+      ...d,
+      transactions: d.transactions.map(t => t.id === id ? { ...t, ...patch } : t),
+    }))
+  }
+
   if (loading) {
     return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div style={{ textAlign: 'center' }}>
@@ -139,7 +150,7 @@ function AppInner({ session }) {
           <div className="fade-in">
             {mode === 'logic' && <LogicView data={data} />}
             {mode === 'cxentrix' && view === 'dashboard' && <Dashboard data={data} setView={setView} />}
-            {mode === 'cxentrix' && view === 'transactions' && <Transactions data={data} reload={loadAllData} />}
+            {mode === 'cxentrix' && view === 'transactions' && <Transactions data={data} reload={loadAllData} patchTransaction={patchTransaction} />}
             {mode === 'cxentrix' && view === 'installments' && <Installments data={data} />}
             {mode === 'cxentrix' && view === 'reports' && <Reports data={data} />}
             {mode === 'cxentrix' && view === 'trend' && <CategoryTrend data={data} />}

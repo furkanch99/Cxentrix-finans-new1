@@ -25,7 +25,7 @@ function categoryColor(name) {
   return CAT_PALETTE[h % CAT_PALETTE.length]
 }
 
-export default function Transactions({ data, reload }) {
+export default function Transactions({ data, reload, patchTransaction }) {
   const toast = useToast()
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
@@ -48,6 +48,10 @@ export default function Transactions({ data, reload }) {
     setCheckedOverride(p => ({ ...p, [tx.id]: next }))
     try {
       await setTransactionChecked(tx.id, next)
+      // Parent state'i de patchle ki sekme değişip geri gelince
+      // yerel checkedOverride sıfırlanmış olsa bile data.transactions
+      // doğru `checked` değerini tutuyor olsun.
+      if (patchTransaction) patchTransaction(tx.id, { checked: next })
     } catch (err) {
       setCheckedOverride(p => {
         const c = { ...p }
