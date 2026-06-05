@@ -29,7 +29,9 @@ export default function Transactions({ data, reload }) {
   const toast = useToast()
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
-  const [year, setYear] = useState('all')        // 'all' | YYYY
+  const [year, setYear] = useState('all')                // 'all' | YYYY
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [paymentFilter, setPaymentFilter] = useState('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [editTx, setEditTx] = useState(null)
@@ -44,6 +46,22 @@ export default function Transactions({ data, reload }) {
   const availableYears = useMemo(() => {
     const ys = new Set(data.transactions.map(t => new Date(t.date).getFullYear()))
     return Array.from(ys).filter(Boolean).sort((a, b) => b - a)
+  }, [data.transactions])
+
+  const availableCategories = useMemo(() => {
+    const set = new Set()
+    data.transactions.forEach(t => {
+      if (!(t.category || '').toLowerCase().includes('french team')) {
+        if (t.category) set.add(t.category)
+      }
+    })
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'tr'))
+  }, [data.transactions])
+
+  const availablePaymentTypes = useMemo(() => {
+    const set = new Set()
+    data.transactions.forEach(t => { if (t.paymentType) set.add(t.paymentType) })
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'tr'))
   }, [data.transactions])
 
   const currentYear = new Date().getFullYear()
@@ -79,9 +97,11 @@ export default function Transactions({ data, reload }) {
     l = l.filter(t => !(t.category || '').toLowerCase().includes('french team'))
     if (filter !== 'all') l = l.filter(t => t.type === filter)
     if (year !== 'all') l = l.filter(t => new Date(t.date).getFullYear() === year)
+    if (categoryFilter !== 'all') l = l.filter(t => (t.category || '') === categoryFilter)
+    if (paymentFilter !== 'all') l = l.filter(t => (t.paymentType || '') === paymentFilter)
     if (search) {
       const s = search.toLowerCase()
-      l = l.filter(t => (t.description||'').toLowerCase().includes(s) || t.category.toLowerCase().includes(s) || (t.customer||'').toLowerCase().includes(s))
+      l = l.filter(t => (t.description||'').toLowerCase().includes(s) || (t.category||'').toLowerCase().includes(s) || (t.customer||'').toLowerCase().includes(s))
     }
     if (dateFrom) l = l.filter(t => t.date >= dateFrom)
     if (dateTo) l = l.filter(t => t.date <= dateTo)
@@ -94,7 +114,7 @@ export default function Transactions({ data, reload }) {
       return a.date.localeCompare(b.date) * dir
     })
     return l
-  }, [data.transactions, filter, year, search, dateFrom, dateTo, sortBy, sortDir])
+  }, [data.transactions, filter, year, categoryFilter, paymentFilter, search, dateFrom, dateTo, sortBy, sortDir])
 
   const totals = useMemo(() => {
     let income = 0, expense = 0
@@ -126,7 +146,7 @@ export default function Transactions({ data, reload }) {
   }
 
   const hasDateFilter = dateFrom || dateTo
-  const hasAnyFilter = filter !== 'all' || year !== 'all' || search || hasDateFilter
+  const hasAnyFilter = filter !== 'all' || year !== 'all' || categoryFilter !== 'all' || paymentFilter !== 'all' || search || hasDateFilter
 
   const handleExportCsv = () => {
     if (list.length === 0) {
@@ -222,6 +242,56 @@ export default function Transactions({ data, reload }) {
           </button>
         </div>
 
+        {/* Orta satır: kategori + ödeme filtreleri */}
+        <div style={{
+          display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
+          paddingTop: 8, borderTop: '1px solid var(--line-soft)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 220 }}>
+            <span style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: categoryFilter !== 'all' ? 'var(--accent)' : 'var(--ink-muted)', fontWeight: 700, whiteSpace: 'nowrap' }}>Kategori</span>
+            <select
+              value={categoryFilter}
+              onChange={e => setCategoryFilter(e.target.value)}
+              style={{
+                flex: 1, minWidth: 140, padding: '7px 10px', fontSize: 12, fontWeight: 600,
+                border: categoryFilter !== 'all' ? '1px solid var(--accent)' : '1px solid var(--line)',
+                background: categoryFilter !== 'all' ? 'var(--accent-soft)' : 'var(--bg-input)',
+                color: categoryFilter !== 'all' ? 'var(--accent)' : 'var(--ink-soft)'
+              }}
+            >
+              <option value="all">Tümü</option>
+              {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {categoryFilter !== 'all' && (
+              <button onClick={() => setCategoryFilter('all')} title="Kategori filtresini kaldır"
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--ink-muted)', padding: 2, fontSize: 14, lineHeight: 1 }}
+              >×</button>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 220 }}>
+            <span style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: paymentFilter !== 'all' ? 'var(--accent)' : 'var(--ink-muted)', fontWeight: 700, whiteSpace: 'nowrap' }}>Ödeme</span>
+            <select
+              value={paymentFilter}
+              onChange={e => setPaymentFilter(e.target.value)}
+              style={{
+                flex: 1, minWidth: 140, padding: '7px 10px', fontSize: 12, fontWeight: 600,
+                border: paymentFilter !== 'all' ? '1px solid var(--accent)' : '1px solid var(--line)',
+                background: paymentFilter !== 'all' ? 'var(--accent-soft)' : 'var(--bg-input)',
+                color: paymentFilter !== 'all' ? 'var(--accent)' : 'var(--ink-soft)'
+              }}
+            >
+              <option value="all">Tümü</option>
+              {availablePaymentTypes.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            {paymentFilter !== 'all' && (
+              <button onClick={() => setPaymentFilter('all')} title="Ödeme filtresini kaldır"
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--ink-muted)', padding: 2, fontSize: 14, lineHeight: 1 }}
+              >×</button>
+            )}
+          </div>
+        </div>
+
         {/* Alt satır: tarih aralığı + quick chip'ler */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
           paddingTop: 8, borderTop: '1px solid var(--line-soft)'
@@ -255,7 +325,7 @@ export default function Transactions({ data, reload }) {
             >{c.label}</button>
           ))}
           {hasAnyFilter && (
-            <button onClick={() => { applyQuickRange('clear'); setFilter('all'); setYear('all'); setSearch('') }}
+            <button onClick={() => { applyQuickRange('clear'); setFilter('all'); setYear('all'); setCategoryFilter('all'); setPaymentFilter('all'); setSearch('') }}
               style={{
                 marginLeft: 'auto', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
                 background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.4)', color: 'var(--red)',
