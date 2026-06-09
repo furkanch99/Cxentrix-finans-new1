@@ -40,6 +40,19 @@ function detectEmployee(description) {
   return null
 }
 
+// Tahakkuk mantığı: ödeme tarihinden 1 ay öncesini "hakediş ayı" olarak
+// kabul et. Şubat 1'de yapılan ödeme Ocak'ın maaşıdır.
+function accrualMonthFor(dateStr) {
+  const d = new Date(dateStr)
+  let m = d.getMonth() - 1
+  let y = d.getFullYear()
+  if (m < 0) {
+    m = 11
+    y -= 1
+  }
+  return { year: y, month: m }
+}
+
 // Renk paleti — kişilere stabil renk atayalım (hash-based).
 const PALETTE = [
   { bg: 'rgba(99, 102, 241, 0.14)', fg: '#6366f1' },
@@ -60,7 +73,7 @@ function colorFor(name) {
 export default function Salaries({ data }) {
   const [year, setYear] = useState(new Date().getFullYear())
 
-  // Ay/yıl filtresi
+  // Ay/yıl filtresi — accrual mantığıyla: ödeme tarihi - 1 ay = hakediş ayı
   const filtered = useMemo(() => {
     const list = []
     data.transactions.forEach(t => {
@@ -69,13 +82,15 @@ export default function Salaries({ data }) {
       if (!emp) return
       const d = new Date(t.date)
       if (isNaN(d.getFullYear())) return
-      if (year !== 'all' && d.getFullYear() !== year) return
+      const acc = accrualMonthFor(t.date)
+      if (year !== 'all' && acc.year !== year) return
       list.push({
         id: t.id,
         employee: emp,
         date: t.date,
-        month: d.getMonth(),
-        year: d.getFullYear(),
+        // accrualMonth/accrualYear: kayıtın AİT olduğu hakediş dönemi
+        month: acc.month,
+        year: acc.year,
         amount: Number(t.amount) || 0,
         paymentType: t.paymentType || '',
         description: t.description || '',
@@ -89,8 +104,8 @@ export default function Salaries({ data }) {
     data.transactions.forEach(t => {
       if (t.type !== 'expense') return
       if (!detectEmployee(t.description)) return
-      const y = new Date(t.date).getFullYear()
-      if (!isNaN(y)) ys.add(y)
+      const acc = accrualMonthFor(t.date)
+      ys.add(acc.year)
     })
     ys.add(new Date().getFullYear())
     return Array.from(ys).sort((a, b) => b - a)
@@ -208,13 +223,15 @@ export default function Salaries({ data }) {
             <div key={`${m.year}-${m.month}`} style={{
               background: 'var(--bg-card)', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden'
             }}>
-              {/* Ay başlığı */}
+              {/* Ay başlığı — hakediş ayı (ödeme genelde 1 ay sonra yapılır) */}
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '14px 18px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--line)'
               }}>
                 <div>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>{monthFull(m.month)} {m.year}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700 }}>
+                    {monthFull(m.month)} {m.year} <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--ink-muted)', marginLeft: 6 }}>maaşı</span>
+                  </div>
                   <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>
                     {m.records.length} kişiye ödendi
                   </div>
@@ -249,6 +266,7 @@ export default function Salaries({ data }) {
                         </div>
                       </div>
                       <div className="mono" style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                        <div style={{ fontSize: 9, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: 1 }}>Ödendi</div>
                         {new Date(r.date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--ink-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.paymentType}>
