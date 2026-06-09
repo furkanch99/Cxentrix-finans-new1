@@ -29,11 +29,24 @@ function normalize(s) {
 
 const NORMALIZED_EMPLOYEES = EMPLOYEES.map(e => ({ name: e, norm: normalize(e) }))
 
-// Açıklamadan çalışan adı tespit et — açıklamada hem "maaş"
-// hem de listedeki bir ad olmalı.
+// Bir transaction'ın maaş ödemesi olup olmadığını belirler.
+//
+// İki kaynak kabul edilir:
+//   1. category === "Maaş"  → tek başına yeter (yeni standart)
+//   2. category contains "çalışan" + description contains "maaş"
+//      → geriye dönük destek (eski "Çalışan Giderleri" kayıtları)
+function isSalaryTx(t) {
+  if (t.type !== 'expense') return false
+  const cat = normalize(t.category)
+  if (cat === 'maas') return true
+  if (cat.includes('calisan') && normalize(t.description).includes('maas')) return true
+  return false
+}
+
+// Açıklamadan çalışan adı tespit et — sadece listedeki adlardan biri
+// geçmeli. "maaş" kelimesi gerekmez çünkü kategori zaten onu temsil ediyor.
 function detectEmployee(description) {
   const norm = normalize(description)
-  if (!norm.includes('maas')) return null
   for (const e of NORMALIZED_EMPLOYEES) {
     if (norm.includes(e.norm)) return e.name
   }
@@ -77,7 +90,7 @@ export default function Salaries({ data }) {
   const filtered = useMemo(() => {
     const list = []
     data.transactions.forEach(t => {
-      if (t.type !== 'expense') return
+      if (!isSalaryTx(t)) return
       const emp = detectEmployee(t.description)
       if (!emp) return
       const d = new Date(t.date)
