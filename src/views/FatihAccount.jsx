@@ -1093,10 +1093,10 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
   const availableYears = useMemo(() => {
     const ys = new Set()
     // Maaş kayıtlarında tarih `date` yerine `year` alanında.
-    fatihData.salaryTxs.forEach(s => { if (s.year != null) ys.add(s.year) })
-    fatihData.tugbaTxs.forEach(s => { if (s.year != null) ys.add(s.year) })
-    fatihData.frenchTxs.forEach(t => { const y = new Date(t.date).getFullYear(); if (!isNaN(y)) ys.add(y) })
-    fatihData.transferTxs.forEach(t => { const y = new Date(t.date).getFullYear(); if (!isNaN(y)) ys.add(y) })
+    ;(fatihData.salaryTxs   || []).forEach(s => { if (s && s.year != null) ys.add(s.year) })
+    ;(fatihData.tugbaTxs    || []).forEach(s => { if (s && s.year != null) ys.add(s.year) })
+    ;(fatihData.frenchTxs   || []).forEach(t => { if (!t) return; const y = new Date(t.date).getFullYear(); if (!isNaN(y)) ys.add(y) })
+    ;(fatihData.transferTxs || []).forEach(t => { if (!t) return; const y = new Date(t.date).getFullYear(); if (!isNaN(y)) ys.add(y) })
     ys.add(new Date().getFullYear())
     return Array.from(ys).sort((a,b) => b-a)
   }, [fatihData])
@@ -1122,8 +1122,8 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
     //   { year, month, amount_chf, amount_try, chf_to_try_rate, ... }
     // Daha önce burada transaction varmış gibi t.date / t.amount okunuyordu,
     // bu yüzden Hakediş tablosundaki Maaş tutarı sürekli 0 çıkıyordu.
-    fatihData.salaryTxs.forEach(sal => {
-      if (sal.year !== year) return
+    ;(fatihData.salaryTxs || []).forEach(sal => {
+      if (!sal || sal.year !== year) return
       const m = sal.month
       if (m == null || m < 0 || m > 11) return
       months[m].salaryChf += safeNumber(sal.amount_chf)
@@ -1132,7 +1132,8 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
       if (rate > 0) months[m].rate = rate
     })
 
-    fatihData.frenchTxs.forEach(t => {
+    ;(fatihData.frenchTxs || []).forEach(t => {
+      if (!t || !t.date) return
       const d = new Date(t.date)
       if (d.getFullYear() !== year) return
       const m = d.getMonth()
@@ -1145,7 +1146,8 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
     // Şirket içi harcamalar (eskiden "Avans") — Fatih'in cebinden ödediği
     // ama kategorisi şirket gideri olan işlemler. Bunlar da hakedişin
     // parçasıdır çünkü şirket Fatih'e bu tutarı borçlanır.
-    fatihData.advanceTxs.forEach(t => {
+    ;(fatihData.advanceTxs || []).forEach(t => {
+      if (!t || !t.date) return
       const d = new Date(t.date)
       if (d.getFullYear() !== year) return
       const m = d.getMonth()
@@ -1155,7 +1157,8 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
       months[m].rate = rate
     })
 
-    fatihData.transferTxs.forEach(t => {
+    ;(fatihData.transferTxs || []).forEach(t => {
+      if (!t || !t.date) return
       const d = new Date(t.date)
       if (d.getFullYear() !== year) return
       const m = d.getMonth()
@@ -1166,8 +1169,8 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
     })
 
     // Tuğba maaşları — fatih_monthly_salaries ile aynı yapıda (year+month)
-    fatihData.tugbaTxs.forEach(s => {
-      if (s.year !== year) return
+    ;(fatihData.tugbaTxs || []).forEach(s => {
+      if (!s || s.year !== year) return
       const m = s.month
       if (m == null || m < 0 || m > 11) return
       months[m].tugbaChf += safeNumber(s.amount_chf)
