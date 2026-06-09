@@ -1,5 +1,9 @@
 import { supabase } from './supabase'
-import { FALLBACK_RATE } from './CurrencyContext'
+// FALLBACK_RATE utils.jsx'ten geliyor (CurrencyContext üzerinden değil)
+// çünkü CurrencyContext bu dosyadan import ediyor → circular import
+// production build'de "Cannot access before initialization" hatasına
+// yol açıyordu.
+import { FALLBACK_RATE } from './utils'
 
 // === TRANSACTIONS ===
 export async function fetchTransactions() {

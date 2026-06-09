@@ -4,6 +4,12 @@ import React from 'react'
 export const LOGO_URL = '/logo-icon.png'
 export const LOGO_FULL_URL = '/logo-full.png'
 
+// CHF -> TL fallback kuru. exchange_rates tablosu boş olduğunda
+// ya da kur bulunamadığında bu değer kullanılır. utils.jsx hem
+// dataService.js hem CurrencyContext.jsx tarafından import edildiği
+// için onların arasındaki circular import'a takılmaz.
+export const FALLBACK_RATE = 54
+
 // === FORMAT YARDIMCILARI ===
 export const fmt = (n) => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0)
 export const fmtTL = (n) => '₺' + fmt(n)

@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { fetchExchangeRates, getLatestRate, fetchTCMBRate, upsertExchangeRate } from './dataService'
+import { FALLBACK_RATE } from './utils'
 
-// Tüm CHF<->TL hesaplamaları için ortak fallback kuru.
-// exchange_rates tablosu boş veya henüz yüklenmemiş olduğunda
-// kullanılır. Mevcut iş kuralı: 1 CHF = 54 TL.
-export const FALLBACK_RATE = 54
+// Geriye uyumluluk için re-export — kod tabanında bazı yerler
+// hâlâ CurrencyContext'ten import ediyor.
+export { FALLBACK_RATE }
 
 const CurrencyContext = createContext()
 
