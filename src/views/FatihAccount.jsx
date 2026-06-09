@@ -1206,15 +1206,19 @@ function HakedisView({ fatihData, settings, getSafeRate }) {
   const totalHakedisTry = monthlyHakedisTry + openingTryForYear
   const totalTransferTry = activeMonths.reduce((s, m) => s + m.transferTry, 0)
   const totalTransferChf = activeMonths.reduce((s, m) => s + m.transferChf, 0)
-  const totalKalanChf = totalHakedisChf - totalTransferChf - totalTugbaChf
-  const totalKalanTry = totalHakedisTry - totalTransferTry - totalTugbaTry
 
-  // Kırılım toplamları (Maaş / Prim / Şirket İçi Harcamalar)
+  // Kırılım toplamları (Maaş / Prim / Şirket İçi Harcamalar / Tuğba)
+  // Bu blok, "kalan" hesaplarından ÖNCE çalışmalı çünkü totalTugbaChf/Try
+  // aşağıda kullanılıyor. Eski sıralama (kalan → tugba) production build'de
+  // "Cannot access 'w' before initialization" TDZ hatasına yol açıyordu.
   const totalSalaryChf  = activeMonths.reduce((s, m) => s + m.salaryChf, 0)
   const totalFrenchChf  = activeMonths.reduce((s, m) => s + m.frenchChf, 0)
   const totalAdvanceChf = activeMonths.reduce((s, m) => s + m.advanceChf, 0)
   const totalTugbaTry   = activeMonths.reduce((s, m) => s + m.tugbaTry, 0)
   const totalTugbaChf   = activeMonths.reduce((s, m) => s + m.tugbaChf, 0)
+
+  const totalKalanChf = totalHakedisChf - totalTransferChf - totalTugbaChf
+  const totalKalanTry = totalHakedisTry - totalTransferTry - totalTugbaTry
 
   return (
     <div className="fade-in">
