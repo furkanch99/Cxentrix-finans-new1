@@ -1,181 +1,137 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { Icon, fmtTL, monthFull, FALLBACK_RATE } from '../utils'
-import { fmtCHF } from '../CurrencyContext'
-import { fetchFatihSalaries, fetchTugbaSalaries } from '../dataService'
+import React, { useState, useMemo } from 'react'
+import { Icon, fmtTL, monthFull } from '../utils'
 import { KPICard } from '../charts'
 import EmptyState from '../EmptyState'
 
 // =====================================================================
-// Maaşlar — tüm çalışanlara ödenen maaşların tek noktadan görüntülenmesi
+// Maaşlar — Cxentrix çalışanlarının (Fatih ve Tuğba HARİÇ) aylık
+// maaş ödemelerinin ay-bazlı görüntüsü.
 //
-// Kaynaklar:
-//   1. fatih_monthly_salaries → Fatih Karakaş'ın aylık tahakkukları
-//   2. tugba_monthly_salaries → Tuğba Karakaş'ın aylık ödemeleri
-//   3. transactions (kategori "Çalışan Giderleri") → diğer çalışan
-//      maaşları (Furkan, Gökşin, Şaban, Onur vs.) — açıklamadan ad
-//      ayıklanır
+// Filtre kuralı:
+//   1. type = expense
+//   2. açıklamada "maaş" geçmeli (Multinet, prim, vs. dışarıda)
+//   3. açıklamada aşağıdaki adlardan biri geçmeli
 // =====================================================================
 
-// Açıklamadan çalışan adı çıkar (heuristik):
-//   "2025 Aralık ayı maaş Gökşin"  → "Gökşin"
-//   "Aralık 2025 Fatih Karakaş Maaş" → "Fatih Karakaş"
-//   Bulamazsa açıklamanın kendisini döner.
-function extractEmployee(description) {
-  const desc = String(description || '').trim()
-  if (!desc) return 'Diğer'
-  // "maaş NAME" veya "maas NAME" → son kelime
-  const matchAfter = desc.match(/maa[sş]\s+([A-ZÇĞİÖŞÜa-zçğıöşü\s]+?)\s*$/i)
-  if (matchAfter && matchAfter[1]) {
-    return matchAfter[1].trim()
+const EMPLOYEES = [
+  'Furkan', 'Onur', 'Arif', 'Nebhen',
+  'Erdinç', 'Gökşin', 'Ali', 'Şaban',
+]
+
+// Türkçe karakterleri sadeleştirip eşleştirme için normalize.
+function normalize(s) {
+  return String(s || '').toLowerCase()
+    .replace(/ş/g, 's').replace(/ı/g, 'i').replace(/İ/g, 'i')
+    .replace(/ğ/g, 'g').replace(/ç/g, 'c')
+    .replace(/ö/g, 'o').replace(/ü/g, 'u')
+    .replace(/â/g, 'a').replace(/î/g, 'i').replace(/û/g, 'u')
+}
+
+const NORMALIZED_EMPLOYEES = EMPLOYEES.map(e => ({ name: e, norm: normalize(e) }))
+
+// Açıklamadan çalışan adı tespit et — açıklamada hem "maaş"
+// hem de listedeki bir ad olmalı.
+function detectEmployee(description) {
+  const norm = normalize(description)
+  if (!norm.includes('maas')) return null
+  for (const e of NORMALIZED_EMPLOYEES) {
+    if (norm.includes(e.norm)) return e.name
   }
-  // Tek kelime olabilir
-  return desc.split(/\s+/).slice(-2).join(' ').trim() || desc
+  return null
+}
+
+// Renk paleti — kişilere stabil renk atayalım (hash-based).
+const PALETTE = [
+  { bg: 'rgba(99, 102, 241, 0.14)', fg: '#6366f1' },
+  { bg: 'rgba(16, 185, 129, 0.14)', fg: '#059669' },
+  { bg: 'rgba(245, 158, 11, 0.16)', fg: '#d97706' },
+  { bg: 'rgba(239, 68, 68, 0.14)',  fg: '#dc2626' },
+  { bg: 'rgba(168, 85, 247, 0.14)', fg: '#9333ea' },
+  { bg: 'rgba(14, 165, 233, 0.14)', fg: '#0284c7' },
+  { bg: 'rgba(236, 72, 153, 0.14)', fg: '#db2777' },
+  { bg: 'rgba(20, 184, 166, 0.14)', fg: '#0d9488' },
+]
+function colorFor(name) {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return PALETTE[h % PALETTE.length]
 }
 
 export default function Salaries({ data }) {
-  const [fatihSalaries, setFatihSalaries] = useState([])
-  const [tugbaSalaries, setTugbaSalaries] = useState([])
-  const [loading, setLoading] = useState(true)
   const [year, setYear] = useState(new Date().getFullYear())
-  const [month, setMonth] = useState('all')
-  const [search, setSearch] = useState('')
-  const [expanded, setExpanded] = useState(null)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function loadData() {
-    setLoading(true)
-    try {
-      const [fatih, tugba] = await Promise.all([
-        fetchFatihSalaries().catch(() => []),
-        fetchTugbaSalaries().catch(() => []),
-      ])
-      setFatihSalaries(fatih || [])
-      setTugbaSalaries(tugba || [])
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Ay/yıl filtresi
+  const filtered = useMemo(() => {
+    const list = []
+    data.transactions.forEach(t => {
+      if (t.type !== 'expense') return
+      const emp = detectEmployee(t.description)
+      if (!emp) return
+      const d = new Date(t.date)
+      if (isNaN(d.getFullYear())) return
+      if (year !== 'all' && d.getFullYear() !== year) return
+      list.push({
+        id: t.id,
+        employee: emp,
+        date: t.date,
+        month: d.getMonth(),
+        year: d.getFullYear(),
+        amount: Number(t.amount) || 0,
+        paymentType: t.paymentType || '',
+        description: t.description || '',
+      })
+    })
+    return list.sort((a, b) => b.date.localeCompare(a.date))
+  }, [data.transactions, year])
 
   const availableYears = useMemo(() => {
     const ys = new Set()
-    fatihSalaries.forEach(s => { if (s.year != null) ys.add(s.year) })
-    tugbaSalaries.forEach(s => { if (s.year != null) ys.add(s.year) })
     data.transactions.forEach(t => {
+      if (t.type !== 'expense') return
+      if (!detectEmployee(t.description)) return
       const y = new Date(t.date).getFullYear()
       if (!isNaN(y)) ys.add(y)
     })
     ys.add(new Date().getFullYear())
     return Array.from(ys).sort((a, b) => b - a)
-  }, [fatihSalaries, tugbaSalaries, data.transactions])
+  }, [data.transactions])
 
-  // Tüm maaş kayıtlarını ortak bir şekle dönüştür
-  const allRecords = useMemo(() => {
-    const recs = []
-
-    // Fatih
-    fatihSalaries.forEach(s => {
-      recs.push({
-        id: 'f-' + s.id,
-        employee: 'Fatih Karakaş',
-        kind: 'fatih',
-        year: s.year,
-        month: s.month,
-        date: `${s.year}-${String(s.month + 1).padStart(2, '0')}-01`,
-        amount_try: Number(s.amount_try) || 0,
-        amount_chf: Number(s.amount_chf) || 0,
-        rate: Number(s.chf_to_try_rate) || FALLBACK_RATE,
-        type: 'Tahakkuk',
-        source: 'Maaş tahakkuk',
-      })
-    })
-
-    // Tuğba
-    tugbaSalaries.forEach(s => {
-      recs.push({
-        id: 't-' + s.id,
-        employee: 'Tuğba Karakaş',
-        kind: 'tugba',
-        year: s.year,
-        month: s.month,
-        date: `${s.year}-${String(s.month + 1).padStart(2, '0')}-01`,
-        amount_try: Number(s.amount_try) || 0,
-        amount_chf: Number(s.amount_chf) || 0,
-        rate: Number(s.chf_to_try_rate) || FALLBACK_RATE,
-        type: 'Tahakkuk',
-        source: 'Tuğba maaş kaydı',
-        notes: s.notes || '',
-      })
-    })
-
-    // Çalışan Giderleri kategorisindeki transaction'lar
-    data.transactions.forEach(t => {
-      const cat = String(t.category || '').toLowerCase()
-      if (!cat.includes('çalışan') && !cat.includes('calisan')) return
-      const d = new Date(t.date)
-      if (isNaN(d.getFullYear())) return
-      const emp = extractEmployee(t.description)
-      recs.push({
-        id: 'x-' + t.id,
-        employee: emp,
-        kind: 'employee',
-        year: d.getFullYear(),
-        month: d.getMonth(),
-        date: t.date,
-        amount_try: Number(t.amount) || 0,
-        amount_chf: Number(t.amount) / FALLBACK_RATE,
-        rate: FALLBACK_RATE,
-        type: t.paymentType || 'Banka',
-        source: t.description || t.category,
-        rawDescription: t.description,
-      })
-    })
-
-    return recs
-  }, [fatihSalaries, tugbaSalaries, data.transactions])
-
-  // Filtre uygula
-  const filtered = useMemo(() => {
-    return allRecords.filter(r => {
-      if (year !== 'all' && r.year !== year) return false
-      if (month !== 'all' && r.month !== month) return false
-      if (search) {
-        const s = search.toLowerCase()
-        if (!r.employee.toLowerCase().includes(s) &&
-            !(r.source || '').toLowerCase().includes(s)) return false
-      }
-      return true
-    }).sort((a, b) => b.date.localeCompare(a.date))
-  }, [allRecords, year, month, search])
-
-  // Çalışana göre grupla
-  const groupedByEmployee = useMemo(() => {
+  // Ay'a göre grupla — newest first
+  const byMonth = useMemo(() => {
     const map = new Map()
     filtered.forEach(r => {
-      if (!map.has(r.employee)) map.set(r.employee, { total: 0, count: 0, records: [] })
-      const g = map.get(r.employee)
-      g.total += r.amount_try
-      g.count += 1
+      const key = `${r.year}-${String(r.month).padStart(2, '0')}`
+      if (!map.has(key)) map.set(key, { year: r.year, month: r.month, records: [], total: 0 })
+      const g = map.get(key)
       g.records.push(r)
+      g.total += r.amount
     })
-    return Array.from(map.entries())
-      .map(([name, v]) => ({ name, ...v }))
+    // Her ayın içinde isme göre sırala (alfabetik, sabit sıra)
+    map.forEach(g => g.records.sort((a, b) => a.employee.localeCompare(b.employee, 'tr')))
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year
+      return b.month - a.month
+    })
+  }, [filtered])
+
+  // Çalışan bazlı yıllık özet
+  const byEmployee = useMemo(() => {
+    const map = new Map()
+    filtered.forEach(r => {
+      if (!map.has(r.employee)) map.set(r.employee, { total: 0, count: 0 })
+      const g = map.get(r.employee)
+      g.total += r.amount
+      g.count += 1
+    })
+    return EMPLOYEES.map(name => ({
+      name,
+      ...(map.get(name) || { total: 0, count: 0 }),
+    })).filter(e => e.count > 0)
       .sort((a, b) => b.total - a.total)
   }, [filtered])
 
-  const grandTotal = filtered.reduce((s, r) => s + r.amount_try, 0)
-  const periodLabel = month === 'all' ? `${year}` : `${monthFull(month)} ${year}`
-
-  if (loading) {
-    return (
-      <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-muted)' }}>
-        <div className="spinner" style={{ width: 30, height: 30, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%', margin: '0 auto 12px' }}/>
-        Maaş verileri yükleniyor...
-      </div>
-    )
-  }
+  const grandTotal = filtered.reduce((s, r) => s + r.amount, 0)
+  const monthsCount = byMonth.length
 
   return (
     <div className="fade-in">
@@ -192,153 +148,138 @@ export default function Salaries({ data }) {
             {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700 }}>Ay</span>
-          <select value={month} onChange={e => setMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            style={{ padding: '7px 10px', fontSize: 12, fontWeight: 600 }}>
-            <option value="all">Tüm yıl</option>
-            {Array.from({ length: 12 }, (_, i) => (
-              <option key={i} value={i}>{monthFull(i)}</option>
-            ))}
-          </select>
+        <div style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-muted)' }}>
+          <strong style={{ color: 'var(--ink)' }}>{filtered.length}</strong> ödeme · <strong style={{ color: 'var(--ink)' }}>{byEmployee.length}</strong> çalışan · <strong style={{ color: 'var(--ink)' }}>{monthsCount}</strong> ay
         </div>
-        <div style={{ flex: 1, position: 'relative', minWidth: 180 }}>
-          <div style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)' }}>
-            <Icon name="search" size={14}/>
+      </div>
+
+      {/* KPI'lar */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 18 }}>
+        <KPICard label={`${year === 'all' ? 'Tüm yıllar' : year} Toplam Maaş`} value={fmtTL(grandTotal)} subtitle={`${filtered.length} ödeme`} icon="wallet" color="purple" big Icon={Icon} />
+        <KPICard label="Aylık Ortalama" value={fmtTL(monthsCount > 0 ? grandTotal / monthsCount : 0)} subtitle={`${monthsCount} ay`} icon="trending" color="blue" big Icon={Icon} />
+        <KPICard label="Çalışan Sayısı" value={String(byEmployee.length)} subtitle={`/ ${EMPLOYEES.length} listede`} icon="users" color="green" big Icon={Icon} />
+      </div>
+
+      {/* Çalışan bazlı yıllık özet (üstte küçük şerit) */}
+      {byEmployee.length > 0 && (
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--line)', borderRadius: 12, padding: 14, marginBottom: 18 }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 10 }}>
+            Çalışan Bazlı Toplam — {year === 'all' ? 'Tüm yıllar' : year}
           </div>
-          <input placeholder="İsim veya açıklama ile ara..." value={search} onChange={e => setSearch(e.target.value)}
-            style={{ width: '100%', padding: '9px 14px 9px 38px', fontSize: 13 }}/>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {byEmployee.map(e => {
+              const c = colorFor(e.name)
+              return (
+                <div key={e.name} style={{
+                  background: c.bg, color: c.fg,
+                  padding: '8px 12px', borderRadius: 10,
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  minWidth: 150
+                }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: '50%',
+                    background: c.fg, color: 'white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif"
+                  }}>
+                    {e.name.slice(0, 1).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>{e.name}</div>
+                    <div className="mono" style={{ fontSize: 11, opacity: 0.85 }}>{fmtTL(e.total)} · {e.count} ay</div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
-          <strong style={{ color: 'var(--ink)' }}>{filtered.length}</strong> kayıt
-        </div>
-      </div>
+      )}
 
-      {/* KPI kartları */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 18 }}>
-        <KPICard label={`${periodLabel} Toplam`} value={fmtTL(grandTotal)} subtitle={`${filtered.length} kayıt`} icon="wallet" color="purple" big Icon={Icon} />
-        <KPICard label="Çalışan Sayısı" value={String(groupedByEmployee.length)} icon="users" color="blue" big Icon={Icon} />
-        <KPICard label="Ortalama Maaş" value={fmtTL(groupedByEmployee.length > 0 ? grandTotal / groupedByEmployee.length : 0)} icon="trending" color="green" big Icon={Icon} />
-        <KPICard label="Toplam CHF" value={fmtCHF(grandTotal / FALLBACK_RATE)} icon="spark" gradient big Icon={Icon} />
-      </div>
-
-      {/* Çalışana göre gruplandırılmış liste */}
-      {groupedByEmployee.length === 0 ? (
+      {/* Ay-bazlı liste */}
+      {byMonth.length === 0 ? (
         <EmptyState
           icon="users"
           title="Bu dönem için maaş kaydı yok"
-          subtitle="Yıl/ay filtresini değiştir veya Fatih hesabı sekmesinden yeni maaş ekle."
+          subtitle="Yıl filtresini değiştir veya İşlemler ekranından maaş kayıtlarını gir."
         />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {groupedByEmployee.map(g => {
-            const isOpen = expanded === g.name
-            const pct = grandTotal > 0 ? (g.total / grandTotal) * 100 : 0
-            return (
-              <div key={g.name} style={{
-                background: 'var(--bg-card)', border: '1px solid ' + (isOpen ? 'var(--accent)' : 'var(--line)'),
-                borderRadius: 12, overflow: 'hidden', transition: 'border 0.2s'
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {byMonth.map(m => (
+            <div key={`${m.year}-${m.month}`} style={{
+              background: 'var(--bg-card)', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden'
+            }}>
+              {/* Ay başlığı */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '14px 18px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--line)'
               }}>
-                <button onClick={() => setExpanded(isOpen ? null : g.name)}
-                  style={{
-                    width: '100%', padding: '14px 18px', background: 'transparent', border: 'none', cursor: 'pointer',
-                    display: 'grid', gridTemplateColumns: '36px 1fr 130px 130px 30px', gap: 14, alignItems: 'center', textAlign: 'left'
-                  }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: 'var(--gradient-1)', color: 'white',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 13, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif"
-                  }}>
-                    {(g.name.split(' ').map(w => w[0]).join('') || '?').toUpperCase().slice(0, 2)}
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 700 }}>{monthFull(m.month)} {m.year}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>
+                    {m.records.length} kişiye ödendi
                   </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>{g.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
-                      {g.count} kayıt · %{pct.toFixed(1)}
-                    </div>
-                    <div style={{ marginTop: 5, height: 4, background: 'var(--line)', borderRadius: 2, overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: 'var(--gradient-1)' }}/>
-                    </div>
-                  </div>
-                  <div className="mono" style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{fmtTL(g.total)}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{fmtCHF(g.total / FALLBACK_RATE)}</div>
-                  </div>
-                  <div className="mono" style={{ textAlign: 'right', fontSize: 11, color: 'var(--ink-muted)' }}>
-                    En son<br/>
-                    <span style={{ fontWeight: 600, color: 'var(--ink-soft)' }}>
-                      {new Date(g.records[0].date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </span>
-                  </div>
-                  <div style={{ color: 'var(--ink-muted)', textAlign: 'center' }}>
-                    <Icon name={isOpen ? 'arrowUp' : 'arrowDown'} size={14}/>
-                  </div>
-                </button>
-
-                {isOpen && (
-                  <div style={{ borderTop: '1px solid var(--line)', background: 'var(--bg-elevated)', padding: '8px 18px 14px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 100px 130px 130px', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--line)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700 }}>
-                      <div>Tarih</div>
-                      <div>Açıklama</div>
-                      <div>Tip</div>
-                      <div style={{ textAlign: 'right' }}>TL</div>
-                      <div style={{ textAlign: 'right' }}>CHF</div>
-                    </div>
-                    {g.records.map(r => (
-                      <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 100px 130px 130px', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--line-soft)', alignItems: 'center', fontSize: 12 }}>
-                        <div className="mono" style={{ color: 'var(--ink-muted)' }}>
-                          {new Date(r.date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </div>
-                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.source}>
-                          {r.source}
-                          {r.notes && <div style={{ fontSize: 10, color: 'var(--ink-muted)' }}>{r.notes}</div>}
-                        </div>
-                        <div>
-                          <span style={{
-                            background: r.kind === 'fatih' ? 'var(--green-soft)' : r.kind === 'tugba' ? 'rgba(244, 63, 94, 0.15)' : 'var(--accent-soft)',
-                            color: r.kind === 'fatih' ? 'var(--green)' : r.kind === 'tugba' ? '#e11d48' : 'var(--accent)',
-                            padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700
-                          }}>{r.type}</span>
-                        </div>
-                        <div className="mono" style={{ textAlign: 'right', fontWeight: 600 }}>{fmtTL(r.amount_try)}</div>
-                        <div className="mono" style={{ textAlign: 'right', color: 'var(--ink-muted)' }}>{fmtCHF(r.amount_chf)}</div>
-                      </div>
-                    ))}
-                    <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 100px 130px 130px', gap: 12, padding: '12px 0 4px', borderTop: '2px solid var(--accent)', alignItems: 'center', fontSize: 13, fontWeight: 700 }}>
-                      <div style={{ color: 'var(--accent)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Toplam</div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-muted)', fontWeight: 400 }}>{g.count} kayıt</div>
-                      <div></div>
-                      <div className="mono" style={{ textAlign: 'right' }}>{fmtTL(g.total)}</div>
-                      <div className="mono" style={{ textAlign: 'right', color: 'var(--ink-muted)' }}>{fmtCHF(g.total / FALLBACK_RATE)}</div>
-                    </div>
-                  </div>
-                )}
+                </div>
+                <div className="mono" style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)' }}>
+                  {fmtTL(m.total)}
+                </div>
               </div>
-            )
-          })}
+
+              {/* Çalışan ödemeleri */}
+              <div style={{ padding: '8px 0' }}>
+                {m.records.map(r => {
+                  const c = colorFor(r.employee)
+                  return (
+                    <div key={r.id} style={{
+                      display: 'grid', gridTemplateColumns: '32px 1fr 130px 140px 100px',
+                      gap: 14, alignItems: 'center', padding: '10px 18px',
+                      borderBottom: '1px solid var(--line-soft)'
+                    }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: c.fg, color: 'white',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 12, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif"
+                      }}>
+                        {r.employee.slice(0, 1).toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>{r.employee}</div>
+                        <div style={{ fontSize: 10, color: 'var(--ink-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }} title={r.description}>
+                          {r.description}
+                        </div>
+                      </div>
+                      <div className="mono" style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                        {new Date(r.date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.paymentType}>
+                        {r.paymentType || '—'}
+                      </div>
+                      <div className="mono" style={{ fontSize: 15, fontWeight: 700, textAlign: 'right', color: 'var(--ink)' }}>
+                        {fmtTL(r.amount)}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
 
           {/* Genel toplam */}
           <div style={{
             background: 'var(--accent-soft)', border: '2px solid var(--accent)', borderRadius: 12,
-            padding: '14px 18px', marginTop: 4,
-            display: 'grid', gridTemplateColumns: '36px 1fr 130px 130px 30px', gap: 14, alignItems: 'center'
+            padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
           }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 6, background: 'var(--accent)', color: 'white',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <Icon name="wallet" size={16}/>
+            <div>
+              <div style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--accent)' }}>
+                Genel Toplam — {year === 'all' ? 'Tüm yıllar' : year}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 4 }}>
+                {filtered.length} ödeme · {monthsCount} ay · {byEmployee.length} çalışan
+              </div>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-              Genel Toplam — {periodLabel}
+            <div className="mono" style={{ fontSize: 24, fontWeight: 700, color: 'var(--accent)' }}>
+              {fmtTL(grandTotal)}
             </div>
-            <div className="mono" style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{fmtTL(grandTotal)}</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{fmtCHF(grandTotal / FALLBACK_RATE)}</div>
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'right' }}>{filtered.length} kayıt</div>
-            <div/>
           </div>
         </div>
       )}
