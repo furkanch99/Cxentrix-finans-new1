@@ -445,6 +445,83 @@ export async function deleteTugbaSalary(id) {
   if (error) throw error
 }
 
+// === AYLIK SABİT ÖDEMELER (RECURRING) ===
+export async function fetchRecurringPayments() {
+  const { data, error } = await supabase
+    .from('recurring_payments')
+    .select('*')
+    .order('payment_day', { ascending: true })
+    .order('name', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+export async function addRecurringPayment({ name, amount, payment_day, category, notes, started_at }) {
+  const user = (await supabase.auth.getUser()).data.user
+  const { data, error } = await supabase
+    .from('recurring_payments')
+    .insert({
+      name,
+      amount,
+      payment_day,
+      category: category || null,
+      notes: notes || null,
+      started_at: started_at || null,
+      created_by: user?.id,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateRecurringPayment(id, updates) {
+  const { data, error } = await supabase
+    .from('recurring_payments')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteRecurringPayment(id) {
+  const { error } = await supabase.from('recurring_payments').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function fetchRecurringPaymentStatusForMonth(year, month) {
+  const { data, error } = await supabase
+    .from('recurring_payment_status')
+    .select('*')
+    .eq('year', year)
+    .eq('month', month)
+  if (error) throw error
+  return data || []
+}
+
+export async function setRecurringPaymentStatus(recurringId, year, month, { is_paid, paid_date, paid_amount, notes }) {
+  const user = (await supabase.auth.getUser()).data.user
+  const payload = {
+    recurring_id: recurringId,
+    year, month,
+    is_paid: !!is_paid,
+    paid_date: is_paid ? (paid_date || new Date().toISOString().slice(0, 10)) : null,
+    paid_amount: is_paid && paid_amount != null ? paid_amount : null,
+    notes: notes || null,
+    updated_by: user?.id,
+    updated_at: new Date().toISOString(),
+  }
+  const { data, error } = await supabase
+    .from('recurring_payment_status')
+    .upsert(payload, { onConflict: 'recurring_id,year,month' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
 // === ÖDEME DURUMU ===
 export async function fetchPaymentStatuses() {
   const { data, error } = await supabase.from('payment_status').select('*')

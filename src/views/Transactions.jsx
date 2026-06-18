@@ -181,7 +181,7 @@ export default function Transactions({ data, reload, patchTransaction }) {
       const s = String(v ?? '')
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
     }
-    const headers = ['Tarih', 'Tip', 'Kategori', 'Açıklama', 'Müşteri', 'Ödeme Tipi', 'Tutar TL', 'Taksit', 'Kontrol']
+    const headers = ['Tarih', 'Tip', 'Kategori', 'Açıklama', 'Müşteri', 'Ödeme Tipi', 'Tutar TL', 'Taksit', 'Faturası var mı?']
     const rows = list.map(t => [
       t.date,
       t.type === 'income' ? 'Gelir' : 'Gider',
@@ -402,7 +402,7 @@ export default function Transactions({ data, reload, patchTransaction }) {
           <div>Ödeme</div>
           <SortHeader label="Tutar"    col="amount"   sortBy={sortBy} sortDir={sortDir} onClick={() => toggleSort('amount')} align="right" />
           <div></div>
-          <div style={{ textAlign: 'center' }}>Tık</div>
+          <div style={{ textAlign: 'center' }}>Faturası var mı?</div>
         </div>
 
         {list.map((tx, i) => {
@@ -490,8 +490,8 @@ export default function Transactions({ data, reload, patchTransaction }) {
               <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <button
                   onClick={() => handleToggleChecked(tx)}
-                  title={checked ? 'Kontrol işaretini kaldır' : 'Kontrol edildi olarak işaretle'}
-                  aria-label={checked ? 'Kontrol işaretini kaldır' : 'Kontrol edildi olarak işaretle'}
+                  title={checked ? 'Faturası VAR — kaldır' : 'Faturası var olarak işaretle'}
+                  aria-label={checked ? 'Faturası var işaretini kaldır' : 'Faturası var olarak işaretle'}
                   className={`tx-check-box ${checked ? 'tx-check-box-on' : ''}`}
                 >
                   <Icon name="check" size={13} />

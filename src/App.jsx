@@ -8,6 +8,7 @@ import PersonnelReport from './views/PersonnelReport'
 import Salaries from './views/Salaries'
 import FatihAccount from './views/FatihAccount'
 import Installments from './views/Installments'
+import RecurringPayments from './views/RecurringPayments'
 import FrenchTeam from './views/FrenchTeam'
 import LogicView from './views/LogicView'
 import Settings from './views/Settings'
@@ -153,6 +154,7 @@ function AppInner({ session }) {
             {mode === 'cxentrix' && view === 'dashboard' && <Dashboard data={data} setView={setView} />}
             {mode === 'cxentrix' && view === 'transactions' && <Transactions data={data} reload={loadAllData} patchTransaction={patchTransaction} />}
             {mode === 'cxentrix' && view === 'installments' && <Installments data={data} />}
+            {mode === 'cxentrix' && view === 'recurring' && <RecurringPayments />}
             {mode === 'cxentrix' && view === 'reports' && <Reports data={data} />}
             {mode === 'cxentrix' && view === 'trend' && <CategoryTrend data={data} />}
             {mode === 'cxentrix' && view === 'personnel' && <PersonnelReport data={data} reload={loadAllData} />}
@@ -174,6 +176,7 @@ function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onLogou
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', section: 'main' },
     { id: 'transactions', label: 'İşlemler', icon: 'list', section: 'main' },
     { id: 'installments', label: 'Taksitlerim', icon: 'spark', section: 'main' },
+    { id: 'recurring', label: 'Sabit Ödemeler', icon: 'wallet', section: 'main' },
     { id: 'reports', label: 'Detay Raporlar', icon: 'chart', section: 'reports' },
     { id: 'trend', label: 'Kategori Trendi', icon: 'trending', section: 'reports' },
     { id: 'personnel', label: 'Ödeyen Raporu', icon: 'users', section: 'people' },
@@ -360,6 +363,7 @@ function Header({ view, mode, setMode }) {
     dashboard: { title: 'Dashboard', sub: 'Finansal durumun anlık özeti ve performans göstergeleri' },
     transactions: { title: 'İşlemler', sub: 'Tüm gelir ve gider kayıtları (French Team Primi hariç)' },
     installments: { title: 'Taksitlerim', sub: 'Aktif taksitli alımlar ve gelecek ay ödemeleri' },
+    recurring: { title: 'Sabit Ödemeler', sub: 'Her ay tekrarlanan ödemelerin hatırlatıcı takvimi (Kira, Aidat, SGK, Kredi Kartı)' },
     reports: { title: 'Detay Raporlar', sub: 'Aylık kâr/zarar analizi ve performans tablosu' },
     trend: { title: 'Kategori Trend Analizi', sub: 'Aylık değişim oranları ve karşılaştırmalı raporlar' },
     personnel: { title: 'Ödeyen Raporu', sub: 'Şirket adına kendi cebinden ödeme yapanların raporu' },
