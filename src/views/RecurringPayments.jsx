@@ -5,6 +5,9 @@ import {
   fetchRecurringPayments,
   fetchRecurringPaymentStatusForMonth,
   setRecurringPaymentStatus,
+  addRecurringPayment,
+  updateRecurringPayment,
+  deleteRecurringPayment,
 } from '../dataService'
 
 // =====================================================================
@@ -26,20 +29,59 @@ export default function RecurringPayments() {
   const [saving, setSaving] = useState({})
   const [editAmountFor, setEditAmountFor] = useState(null)
   const [amountInput, setAmountInput] = useState('')
+  const [showFormFor, setShowFormFor] = useState(null) // 'new' | item object | null
 
-  // İlk yükleme: kalem listesi (değişmez, tek sefer)
+  const loadItems = async () => {
+    try {
+      const list = await fetchRecurringPayments()
+      setItems(list)
+    } catch (err) {
+      toast.error('Sabit ödemeler yüklenemedi: ' + err.message)
+    }
+  }
+
+  // İlk yükleme: kalem listesi
   useEffect(() => {
-    let alive = true
-    ;(async () => {
-      try {
-        const list = await fetchRecurringPayments()
-        if (alive) setItems(list)
-      } catch (err) {
-        toast.error('Sabit ödemeler yüklenemedi: ' + err.message)
-      }
-    })()
-    return () => { alive = false }
+    loadItems()
   }, [])
+
+  const handleSaveItem = async (form, existingId) => {
+    try {
+      if (existingId) {
+        await updateRecurringPayment(existingId, {
+          name: form.name.trim(),
+          amount: form.amount === '' ? null : parseFloat(form.amount),
+          payment_day: parseInt(form.payment_day, 10),
+          notes: form.notes.trim() || null,
+        })
+        toast.success(`${form.name} güncellendi`)
+      } else {
+        await addRecurringPayment({
+          name: form.name.trim(),
+          amount: form.amount === '' ? null : parseFloat(form.amount),
+          payment_day: parseInt(form.payment_day, 10),
+          notes: form.notes.trim() || null,
+          category: null,
+        })
+        toast.success(`${form.name} eklendi`)
+      }
+      setShowFormFor(null)
+      await loadItems()
+    } catch (err) {
+      toast.error('Kaydedilemedi: ' + err.message)
+    }
+  }
+
+  const handleDeleteItem = async (item) => {
+    if (!confirm(`"${item.name}" kalemini silmek istediğine emin misin? Bu kalem için tüm aylık ödendi/bekliyor kayıtları da silinecek.`)) return
+    try {
+      await deleteRecurringPayment(item.id)
+      toast.success(`${item.name} silindi`)
+      await loadItems()
+    } catch (err) {
+      toast.error('Silinemedi: ' + err.message)
+    }
+  }
 
   // Ay/yıl değişince durumları yeniden çek
   useEffect(() => {
@@ -171,6 +213,22 @@ export default function RecurringPayments() {
         )}
       </div>
 
+      {/* Yeni kalem ekle butonu */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+        <button
+          onClick={() => setShowFormFor('new')}
+          style={{
+            background: 'var(--gradient-1)', color: 'white',
+            padding: '10px 18px', borderRadius: 10,
+            fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            border: 'none', display: 'flex', alignItems: 'center', gap: 8,
+            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)'
+          }}
+        >
+          <Icon name="plus" size={14}/> Yeni Kalem Ekle
+        </button>
+      </div>
+
       {/* KPI özet */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 18 }}>
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--green)', borderRadius: 12, padding: 16 }}>
@@ -214,7 +272,7 @@ export default function RecurringPayments() {
                 borderRadius: 12,
                 padding: '14px 18px',
                 display: 'grid',
-                gridTemplateColumns: '50px 1fr auto auto',
+                gridTemplateColumns: '50px 1fr auto auto auto',
                 gap: 16,
                 alignItems: 'center',
                 opacity: paid ? 0.85 : 1,
@@ -313,6 +371,32 @@ export default function RecurringPayments() {
                 >
                   <Icon name="check" size={20}/>
                 </button>
+
+                {/* Düzenle / Sil */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <button
+                    onClick={() => setShowFormFor(item)}
+                    title="Düzenle"
+                    style={{
+                      width: 28, height: 22, borderRadius: 5,
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                  >
+                    <Icon name="edit" size={13}/>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteItem(item)}
+                    title="Sil"
+                    style={{
+                      width: 28, height: 22, borderRadius: 5,
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      color: 'var(--ink-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                  >
+                    <Icon name="trash" size={13}/>
+                  </button>
+                </div>
               </div>
             )
           })}
@@ -324,9 +408,127 @@ export default function RecurringPayments() {
           background: 'var(--bg-card)', border: '1px dashed var(--line)',
           borderRadius: 12, padding: 40, textAlign: 'center', color: 'var(--ink-muted)'
         }}>
-          Sabit ödeme kalemi bulunamadı.
+          Sabit ödeme kalemi bulunamadı. Üstteki "Yeni Kalem Ekle" butonu ile başla.
         </div>
       )}
+
+      {showFormFor && (
+        <ItemForm
+          existing={showFormFor === 'new' ? null : showFormFor}
+          onSave={handleSaveItem}
+          onClose={() => setShowFormFor(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ============= YENİ / DÜZENLE FORM MODALI =============
+function ItemForm({ existing, onSave, onClose }) {
+  const [form, setForm] = useState({
+    name: existing?.name || '',
+    payment_day: existing?.payment_day || 1,
+    amount: existing?.amount != null ? String(existing.amount) : '',
+    notes: existing?.notes || '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  const canSave = form.name.trim().length > 0 &&
+                  form.payment_day >= 1 && form.payment_day <= 31
+
+  const handleSave = async () => {
+    if (!canSave) return
+    setSaving(true)
+    await onSave(form, existing?.id)
+    setSaving(false)
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(15, 17, 23, 0.6)',
+      backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 100, padding: 20
+    }}>
+      <div onClick={e => e.stopPropagation()} className="fade-in" style={{
+        background: 'var(--bg-card)', borderRadius: 16, padding: 28,
+        width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto',
+        boxShadow: 'var(--shadow-lg)'
+      }}>
+        <h2 className="display" style={{ fontSize: 20, marginBottom: 4 }}>
+          {existing ? 'Kalemi Düzenle' : 'Yeni Sabit Ödeme Kalemi'}
+        </h2>
+        <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginBottom: 20 }}>
+          {existing ? 'Bilgileri güncelle' : 'Her ay tekrarlanacak bir ödeme kalemi ekle'}
+        </p>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>Kalem Adı *</label>
+          <input
+            type="text" autoFocus
+            value={form.name}
+            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+            placeholder="Örn: İnternet, Telefon, Servis"
+            style={{ width: '100%', padding: '10px 12px', fontSize: 14, fontWeight: 500 }}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>Ödeme Günü *</label>
+            <input
+              type="number" min="1" max="31"
+              value={form.payment_day}
+              onChange={e => setForm(f => ({ ...f, payment_day: e.target.value }))}
+              placeholder="1-31"
+              style={{ width: '100%', padding: '10px 12px', fontSize: 14, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}
+            />
+            <div style={{ fontSize: 10, color: 'var(--ink-muted)', marginTop: 4 }}>
+              Her ayın hangi günü? (örn. 1, 15, 28)
+            </div>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>Tutar (TL)</label>
+            <input
+              type="number" step="0.01" min="0"
+              value={form.amount}
+              onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+              placeholder="Opsiyonel"
+              style={{ width: '100%', padding: '10px 12px', fontSize: 14, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}
+            />
+            <div style={{ fontSize: 10, color: 'var(--ink-muted)', marginTop: 4 }}>
+              Her ay aynıysa gir, değişiyorsa boş bırak
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700, marginBottom: 6 }}>Not (opsiyonel)</label>
+          <input
+            type="text"
+            value={form.notes}
+            onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+            placeholder="Hatırlatıcı bilgi"
+            style={{ width: '100%', padding: '10px 12px', fontSize: 13 }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{
+            padding: '10px 18px', borderRadius: 8,
+            background: 'var(--bg-input)', border: '1px solid var(--line)',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer'
+          }}>İptal</button>
+          <button onClick={handleSave} disabled={!canSave || saving} style={{
+            padding: '10px 20px', borderRadius: 8,
+            background: 'var(--gradient-1)', color: 'white',
+            border: 'none', fontSize: 12, fontWeight: 700,
+            cursor: saving ? 'wait' : 'pointer',
+            opacity: (!canSave || saving) ? 0.5 : 1
+          }}>
+            {saving ? 'Kaydediliyor...' : existing ? 'Güncelle' : 'Ekle'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
