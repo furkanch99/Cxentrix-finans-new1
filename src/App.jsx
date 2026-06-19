@@ -6,6 +6,7 @@ import Reports from './views/Reports'
 import CategoryTrend from './views/CategoryTrend'
 import PersonnelReport from './views/PersonnelReport'
 import Salaries from './views/Salaries'
+import SalaryPlan from './views/SalaryPlan'
 import FatihAccount from './views/FatihAccount'
 import Installments from './views/Installments'
 import RecurringPayments from './views/RecurringPayments'
@@ -159,6 +160,7 @@ function AppInner({ session }) {
             {mode === 'cxentrix' && view === 'trend' && <CategoryTrend data={data} />}
             {mode === 'cxentrix' && view === 'personnel' && <PersonnelReport data={data} reload={loadAllData} />}
             {mode === 'cxentrix' && view === 'salaries' && <Salaries data={data} />}
+            {mode === 'cxentrix' && view === 'salary-plan' && <SalaryPlan />}
             {mode === 'cxentrix' && view === 'fatih' && <FatihAccount data={data} reload={loadAllData} />}
             {mode === 'cxentrix' && view === 'french' && <FrenchTeam reload={loadAllData} />}
             {mode === 'cxentrix' && view === 'monthly-rates' && <MonthlyRates reload={loadAllData} />}
@@ -181,6 +183,7 @@ function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onLogou
     { id: 'trend', label: 'Kategori Trendi', icon: 'trending', section: 'reports' },
     { id: 'personnel', label: 'Ödeyen Raporu', icon: 'users', section: 'people' },
     { id: 'salaries', label: 'Maaşlar', icon: 'users', section: 'people' },
+    { id: 'salary-plan', label: 'Maaş Planı + Avans', icon: 'wallet', section: 'people' },
     { id: 'fatih', label: 'Fatih Hesabı', icon: 'wallet', section: 'people' },
     { id: 'french', label: 'French Team Primi', icon: 'spark', section: 'people' },
     { id: 'monthly-rates', label: 'Aylık Kurlar', icon: 'spark', section: 'system' },
@@ -368,6 +371,7 @@ function Header({ view, mode, setMode }) {
     trend: { title: 'Kategori Trend Analizi', sub: 'Aylık değişim oranları ve karşılaştırmalı raporlar' },
     personnel: { title: 'Ödeyen Raporu', sub: 'Şirket adına kendi cebinden ödeme yapanların raporu' },
     salaries: { title: 'Maaşlar', sub: 'Tüm çalışanlara ödenen maaşlar — Fatih, Tuğba ve diğer ekip' },
+    'salary-plan': { title: 'Maaş Planı + Avans', sub: 'Bir sonraki ayın maaş planı — tam tutar, verilen avans, ödenecek net' },
     fatih: { title: 'Fatih Karakaş — Cari Hesap', sub: 'Maaş, prim, transferler ve net bakiye' },
     french: { title: 'French Team Primi', sub: 'Aylık sales ve retention bazlı prim hesabı' },
     'monthly-rates': { title: 'Aylık Kurlar', sub: 'CHF/TL kurlarını her ay için elle gir — tüm uygulamada kullanılır' },

@@ -445,6 +445,70 @@ export async function deleteTugbaSalary(id) {
   if (error) throw error
 }
 
+// === MAAŞ PLANI + AVANS ===
+export async function fetchSalaryPlan(year, month) {
+  const { data, error } = await supabase
+    .from('salary_plan')
+    .select('*')
+    .eq('year', year)
+    .eq('month', month)
+  if (error) throw error
+  return data || []
+}
+
+export async function upsertSalaryPlan(employee, year, month, fields) {
+  const user = (await supabase.auth.getUser()).data.user
+  const payload = {
+    employee_name: employee,
+    year, month,
+    ...fields,
+    updated_by: user?.id,
+    updated_at: new Date().toISOString(),
+  }
+  const { data, error } = await supabase
+    .from('salary_plan')
+    .upsert(payload, { onConflict: 'employee_name,year,month' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function fetchAdvancesForMonth(targetYear, targetMonth) {
+  const { data, error } = await supabase
+    .from('salary_advance')
+    .select('*')
+    .eq('target_year', targetYear)
+    .eq('target_month', targetMonth)
+    .order('advance_date', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function addAdvance({ employee, amount, advance_date, target_year, target_month, notes }) {
+  const user = (await supabase.auth.getUser()).data.user
+  const { data, error } = await supabase
+    .from('salary_advance')
+    .insert({
+      employee_name: employee,
+      amount,
+      advance_date,
+      target_year,
+      target_month,
+      notes: notes || null,
+      created_by: user?.id,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteAdvance(id) {
+  const { error } = await supabase.from('salary_advance').delete().eq('id', id)
+  if (error) throw error
+}
+
 // === AYLIK SABİT ÖDEMELER (RECURRING) ===
 export async function fetchRecurringPayments() {
   const { data, error } = await supabase
