@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Icon, fmtTL, monthFull } from '../utils'
+import { Icon, fmtTL, monthFull, monthName } from '../utils'
 import { useToast } from '../Toast'
 import {
   fetchRecurringPayments,
@@ -278,7 +278,7 @@ export default function RecurringPayments() {
                 opacity: paid ? 0.85 : 1,
                 transition: 'all 0.2s'
               }}>
-                {/* Gün rozeti — büyük rakam */}
+                {/* Tarih rozeti — gün + ay */}
                 <div style={{
                   width: 50, height: 50, borderRadius: 10,
                   background: paid ? 'var(--green-soft)' : isOverdue ? 'var(--red-soft)' : isUpcoming ? 'rgba(245, 158, 11, 0.12)' : 'var(--bg-input)',
@@ -286,15 +286,16 @@ export default function RecurringPayments() {
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                   fontFamily: "'Space Grotesk', sans-serif"
                 }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>{due}</div>
-                  <div style={{ fontSize: 9, letterSpacing: '0.1em', marginTop: 1 }}>GÜN</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>{Math.min(due, daysInMonth)}</div>
+                  <div style={{ fontSize: 9, letterSpacing: '0.08em', marginTop: 1, textTransform: 'uppercase' }}>{monthName(month)}</div>
                 </div>
 
                 {/* İsim + alt bilgi */}
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 2 }}>{item.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
-                    {item.notes || `Her ayın ${due}'i`}
+                    {dueDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    {item.notes && <span style={{ marginLeft: 8, opacity: 0.7 }}>· {item.notes}</span>}
                   </div>
                   {paid && st.paid_date && (
                     <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 3, fontWeight: 600 }}>
