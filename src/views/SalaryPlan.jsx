@@ -26,7 +26,7 @@ import {
 
 const EMPLOYEES = [
   'Furkan', 'Onur', 'Arif', 'Nebhen',
-  'Erdinç', 'Gökşin', 'Ali', 'Şaban',
+  'Erdinç', 'Gökşin', 'Ali',
 ]
 
 export default function SalaryPlan() {
