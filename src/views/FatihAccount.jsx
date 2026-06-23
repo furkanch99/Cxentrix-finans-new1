@@ -386,9 +386,6 @@ function SummaryView({ fatihData, settings, salaries, tugbaSalaries, onAddSalary
         </div>
       </div>
 
-      {/* Son hareketler timeline */}
-      <RecentActivityPanel fatihData={fatihData} />
-
       {/* Sekmeli detay paneli: Maaş / Prim / Transfer / Şirket İçi / Tuğba */}
       <GroupedDetailPanel
         fatihData={fatihData}
@@ -397,6 +394,9 @@ function SummaryView({ fatihData, settings, salaries, tugbaSalaries, onAddSalary
         handleDeleteSalary={handleDeleteSalary}
         handleDeleteTugba={handleDeleteTugba}
       />
+
+      {/* Aylık transfer grafiği */}
+      <TransferMonthlyChart transferTxs={fatihData.transferTxs} />
     </div>
   )
 }
@@ -428,92 +428,123 @@ function BalanceDonut({ data }) {
 }
 
 // ============= SON HAREKETLER TIMELINE =============
-function RecentActivityPanel({ fatihData }) {
-  const events = useMemo(() => {
-    const all = []
-    fatihData.salaryTxs.forEach(s => {
-      // Maaş satırlarında date yok, year+month kullanılır → ayın 1'i olarak ele al
-      const d = (s.year != null && s.month != null)
-        ? `${s.year}-${String(s.month + 1).padStart(2, '0')}-01`
-        : null
-      if (!d) return
-      all.push({
-        kind: 'salary',
-        date: d,
-        amount_try: safeNumber(s.amount_try),
-        amount_chf: safeNumber(s.amount_chf),
-        label: `${monthFull(s.month)} ${s.year} maaşı`,
-        sign: '+', color: 'var(--green)', icon: 'users',
-      })
+// ============= AYLIK TRANSFER GRAFİĞİ =============
+function TransferMonthlyChart({ transferTxs }) {
+  // Yıl seçimi: mevcut transfer kayıtlarındaki yıllar + bu yıl
+  const availableYears = useMemo(() => {
+    const ys = new Set()
+    ;(transferTxs || []).forEach(t => {
+      if (!t || !t.date) return
+      const y = new Date(t.date).getFullYear()
+      if (!isNaN(y)) ys.add(y)
     })
-    fatihData.frenchTxs.forEach(t => {
-      all.push({
-        kind: 'french', date: t.date,
-        amount_try: safeNumber(t.amount), amount_chf: safeNumber(t.amount) / 54,
-        label: t.description || 'French Team Primi',
-        sign: '+', color: 'var(--blue)', icon: 'spark',
-      })
-    })
-    fatihData.advanceTxs.forEach(t => {
-      all.push({
-        kind: 'advance', date: t.date,
-        amount_try: safeNumber(t.amount), amount_chf: safeNumber(t.amount) / 54,
-        label: t.description ? `Şirket içi harcama: ${t.description}` : `Şirket içi harcama (${t.category})`,
-        sign: '+', color: 'var(--amber)', icon: 'arrowUp',
-      })
-    })
-    fatihData.transferTxs.forEach(t => {
-      all.push({
-        kind: 'transfer', date: t.date,
-        amount_try: safeNumber(t.amount), amount_chf: safeNumber(t.amount) / 54,
-        label: t.description || 'Şirket → Fatih Transferi',
-        sign: '−', color: 'var(--red)', icon: 'arrowDown',
-      })
-    })
-    fatihData.tugbaTxs.forEach(s => {
-      // Tuğba maaşı kayıtlarında tarih `date` yerine `year+month` üzerinden hesaplanır
-      const d = (s.year != null && s.month != null)
-        ? `${s.year}-${String(s.month + 1).padStart(2, '0')}-01`
-        : null
-      if (!d) return
-      all.push({
-        kind: 'tugba', date: d,
-        amount_try: safeNumber(s.amount_try),
-        amount_chf: safeNumber(s.amount_chf),
-        label: `${monthFull(s.month)} ${s.year} Tuğba maaşı${s.notes ? ' — ' + s.notes : ''}`,
-        sign: '−', color: '#f43f5e', icon: 'users',
-      })
-    })
-    return all.sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 15)
-  }, [fatihData])
+    ys.add(new Date().getFullYear())
+    return Array.from(ys).sort((a, b) => b - a)
+  }, [transferTxs])
 
-  if (events.length === 0) return null
+  const [year, setYear] = useState(new Date().getFullYear())
+
+  // Ay bazlı toplama
+  const monthly = useMemo(() => {
+    const sums = Array.from({ length: 12 }, () => 0)
+    ;(transferTxs || []).forEach(t => {
+      if (!t || !t.date) return
+      const d = new Date(t.date)
+      if (d.getFullYear() !== year) return
+      const m = d.getMonth()
+      sums[m] += safeNumber(t.amount)
+    })
+    return sums
+  }, [transferTxs, year])
+
+  const max = Math.max(...monthly, 1)
+  const total = monthly.reduce((s, v) => s + v, 0)
+  const activeMonths = monthly.filter(v => v > 0).length
+  const avg = activeMonths > 0 ? total / activeMonths : 0
 
   return (
-    <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 18, border: '1px solid var(--line)', marginBottom: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
-        <h3 className="display" style={{ fontSize: 15 }}>Son Hareketler</h3>
-        <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{events.length} kayıt</div>
+    <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 20, border: '1px solid var(--line)', marginTop: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+        <div>
+          <h3 className="display" style={{ fontSize: 16, marginBottom: 2 }}>Aylık Transfer Grafiği</h3>
+          <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
+            Şirket'ten Fatih'e yapılan transferler — {year}
+          </div>
+        </div>
+        <select
+          value={year}
+          onChange={e => setYear(Number(e.target.value))}
+          style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600 }}
+        >
+          {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {events.map((e, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '36px 90px 1fr 130px', gap: 10, padding: '8px 8px', borderRadius: 6, alignItems: 'center', background: i % 2 === 0 ? 'var(--bg-elevated)' : 'transparent' }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.04)', color: e.color, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${e.color}` }}>
-              <Icon name={e.icon} size={13} />
+
+      {/* 3 KPI */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+        <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '10px 12px' }}>
+          <div style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700 }}>Yıl Toplam</div>
+          <div className="mono" style={{ fontSize: 16, fontWeight: 700, color: 'var(--red)', marginTop: 2 }}>{fmtTL(total)}</div>
+        </div>
+        <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '10px 12px' }}>
+          <div style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700 }}>Aktif Ay</div>
+          <div className="mono" style={{ fontSize: 16, fontWeight: 700, marginTop: 2 }}>{activeMonths} ay</div>
+        </div>
+        <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '10px 12px' }}>
+          <div style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', fontWeight: 700 }}>Aylık Ortalama</div>
+          <div className="mono" style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink-soft)', marginTop: 2 }}>{fmtTL(avg)}</div>
+        </div>
+      </div>
+
+      {/* Çubuk grafiği */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 6, alignItems: 'end', height: 180, padding: '0 4px' }}>
+        {monthly.map((amount, i) => {
+          const h = max > 0 ? (amount / max) * 140 : 0
+          const isActive = amount > 0
+          return (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <div style={{
+                fontSize: 9, color: isActive ? 'var(--ink-soft)' : 'var(--ink-faint)',
+                fontWeight: isActive ? 700 : 400, textAlign: 'center', minHeight: 12,
+                fontFamily: "'JetBrains Mono', monospace"
+              }}>
+                {isActive ? fmtTL(amount).replace(' TL', '') : ''}
+              </div>
+              <div
+                title={`${monthFull(i)} ${year}: ${fmtTL(amount)}`}
+                style={{
+                  width: '100%',
+                  height: Math.max(h, isActive ? 4 : 0),
+                  background: isActive
+                    ? 'linear-gradient(180deg, #ef4444 0%, #b91c1c 100%)'
+                    : 'transparent',
+                  borderRadius: '6px 6px 0 0',
+                  transition: 'height 0.3s',
+                  boxShadow: isActive ? '0 2px 6px rgba(239, 68, 68, 0.25)' : 'none',
+                }}
+              />
             </div>
-            <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
-              {new Date(e.date).toLocaleDateString('tr-TR')}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.label}>
-              {e.label}
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: e.color }}>{e.sign}{fmtCHF(Math.abs(e.amount_chf))}</div>
-              <div className="mono" style={{ fontSize: 10, color: 'var(--ink-muted)' }}>{e.sign}{fmtTL(Math.abs(e.amount_try))}</div>
-            </div>
+          )
+        })}
+      </div>
+
+      {/* Ay isimleri */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 6, paddingTop: 8, borderTop: '1px solid var(--line-soft)' }}>
+        {Array.from({ length: 12 }, (_, i) => i).map(i => (
+          <div key={i} style={{
+            fontSize: 10, fontWeight: monthly[i] > 0 ? 700 : 400,
+            textAlign: 'center', color: monthly[i] > 0 ? 'var(--ink)' : 'var(--ink-muted)'
+          }}>
+            {monthName(i)}
           </div>
         ))}
       </div>
+
+      {total === 0 && (
+        <div style={{ marginTop: 16, padding: '14px', textAlign: 'center', fontSize: 12, color: 'var(--ink-muted)', background: 'var(--bg-elevated)', borderRadius: 8 }}>
+          {year} yılı için Şirket → Fatih transferi kaydı yok.
+        </div>
+      )}
     </div>
   )
 }
