@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { Icon, fmtTL, monthFull } from '../utils'
 import { KPICard } from '../charts'
 import EmptyState from '../EmptyState'
+import SalaryPlan from './SalaryPlan'
 
 // =====================================================================
 // Maaşlar — Cxentrix çalışanlarının (Fatih ve Tuğba HARİÇ) aylık
@@ -83,7 +84,46 @@ function colorFor(name) {
   return PALETTE[h % PALETTE.length]
 }
 
+// Üst seviye wrapper — iki sekme: Ödenen Maaşlar / Maaş Planı + Avans
 export default function Salaries({ data }) {
+  const [tab, setTab] = useState('paid')
+
+  return (
+    <div className="fade-in">
+      {/* Sekme bar */}
+      <div style={{
+        display: 'flex', gap: 4, background: 'var(--bg-card)', border: '1px solid var(--line)',
+        borderRadius: 10, padding: 4, marginBottom: 18, width: 'fit-content'
+      }}>
+        <button onClick={() => setTab('paid')} style={{
+          padding: '9px 18px', borderRadius: 7, fontSize: 12, fontWeight: 700,
+          background: tab === 'paid' ? 'var(--gradient-1)' : 'transparent',
+          color: tab === 'paid' ? 'white' : 'var(--ink-muted)',
+          border: 'none', cursor: 'pointer',
+          boxShadow: tab === 'paid' ? '0 2px 8px rgba(99, 102, 241, 0.3)' : 'none',
+          display: 'flex', alignItems: 'center', gap: 6
+        }}>
+          <Icon name="wallet" size={13}/> Ödenen Maaşlar
+        </button>
+        <button onClick={() => setTab('plan')} style={{
+          padding: '9px 18px', borderRadius: 7, fontSize: 12, fontWeight: 700,
+          background: tab === 'plan' ? 'var(--gradient-1)' : 'transparent',
+          color: tab === 'plan' ? 'white' : 'var(--ink-muted)',
+          border: 'none', cursor: 'pointer',
+          boxShadow: tab === 'plan' ? '0 2px 8px rgba(99, 102, 241, 0.3)' : 'none',
+          display: 'flex', alignItems: 'center', gap: 6
+        }}>
+          <Icon name="trending" size={13}/> Maaş Planı + Avans
+        </button>
+      </div>
+
+      {tab === 'paid' ? <PaidSalaries data={data} /> : <SalaryPlan />}
+    </div>
+  )
+}
+
+// ============= ÖDENEN MAAŞLAR =============
+function PaidSalaries({ data }) {
   const [year, setYear] = useState(new Date().getFullYear())
 
   // Ay/yıl filtresi — accrual mantığıyla: ödeme tarihi - 1 ay = hakediş ayı
