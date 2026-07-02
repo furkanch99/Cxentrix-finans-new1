@@ -11,6 +11,7 @@ import Installments from './views/Installments'
 import RecurringPayments from './views/RecurringPayments'
 import FrenchTeam from './views/FrenchTeam'
 import LogicView from './views/LogicView'
+import DealerCalculator from './views/DealerCalculator'
 import Settings from './views/Settings'
 import MonthlyRates from './MonthlyRates'
 import AddModal from './views/AddModal'
@@ -161,6 +162,7 @@ function AppInner({ session }) {
             {mode === 'cxentrix' && view === 'salaries' && <Salaries data={data} />}
             {mode === 'cxentrix' && view === 'fatih' && <FatihAccount data={data} reload={loadAllData} />}
             {mode === 'cxentrix' && view === 'french' && <FrenchTeam reload={loadAllData} />}
+            {mode === 'cxentrix' && view === 'dealer-calc' && <DealerCalculator />}
             {mode === 'cxentrix' && view === 'monthly-rates' && <MonthlyRates reload={loadAllData} />}
             {mode === 'cxentrix' && view === 'settings' && <Settings data={data} reload={loadAllData} />}
           </div>
@@ -183,6 +185,7 @@ function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onLogou
     { id: 'salaries', label: 'Maaşlar', icon: 'users', section: 'people' },
     { id: 'fatih', label: 'Fatih Hesabı', icon: 'wallet', section: 'people' },
     { id: 'french', label: 'French Team Primi', icon: 'spark', section: 'people' },
+    { id: 'dealer-calc', label: 'Bayi Kâr Hesaplama', icon: 'trending', section: 'tools' },
     { id: 'monthly-rates', label: 'Aylık Kurlar', icon: 'spark', section: 'system' },
     { id: 'settings', label: 'Ayarlar', icon: 'settings', section: 'system' },
   ]
@@ -194,7 +197,7 @@ function Sidebar({ mode, view, setView, onAdd, theme, toggleTheme, user, onLogou
   const items = mode === 'logic' ? logicItems : cxentrixItems
   const sections = mode === 'logic'
     ? { logic: 'Logic Holding Görünümü' }
-    : { main: 'Ana', reports: 'Raporlar', people: 'Kişiler', system: 'Sistem' }
+    : { main: 'Ana', reports: 'Raporlar', people: 'Kişiler', tools: 'Araçlar', system: 'Sistem' }
 
   const logoFilter = theme === 'dark'
     ? 'brightness(0) invert(1) drop-shadow(0 0 8px rgba(99, 102, 241, 0.6))'
@@ -370,6 +373,7 @@ function Header({ view, mode, setMode }) {
     salaries: { title: 'Maaşlar', sub: 'Ödenen maaşlar ve sonraki ayın maaş planı + avans takibi' },
     fatih: { title: 'Fatih Karakaş — Cari Hesap', sub: 'Maaş, prim, transferler ve net bakiye' },
     french: { title: 'French Team Primi', sub: 'Aylık sales ve retention bazlı prim hesabı' },
+    'dealer-calc': { title: 'Bayi Kâr Hesaplama', sub: 'Logic CC / Logic AI / Voice AI için 4 bayi modelinde kâr-zarar analizi' },
     'monthly-rates': { title: 'Aylık Kurlar', sub: 'CHF/TL kurlarını her ay için elle gir — tüm uygulamada kullanılır' },
     settings: { title: 'Ayarlar', sub: 'Kategoriler, ödeme türleri, kur ve veri yönetimi' },
     'logic-summary': { title: 'Logic Holding Görünümü', sub: 'Cxentrix Solutions maliyet raporu — yıllık özet ve detay' },
