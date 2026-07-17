@@ -38,22 +38,28 @@ export default function LogicReport({ data }) {
     })
   }, [data.transactions, year, month])
 
+  const monthEnd = new Date(year, month + 1, 0).toISOString().slice(0, 10)
+  const monthEndRate = getRateAt(monthEnd)
+
+  // Sabit CHF (Fatih maasi, French primi) icin DB'deki tutari kullan;
+  // diger islemler icin TL/kur cevir.
+  const chfOf = (t) => t.nativeChfAmount != null ? t.nativeChfAmount : (t.amount / monthEndRate)
+
   // Kategori bazlı toplam
   const byCategory = useMemo(() => {
     const map = {}
     monthTxs.forEach(t => {
-      if (!map[t.category]) map[t.category] = { total: 0, count: 0, items: [] }
+      if (!map[t.category]) map[t.category] = { total: 0, totalChf: 0, count: 0, items: [] }
       map[t.category].total += t.amount
+      map[t.category].totalChf += chfOf(t)
       map[t.category].count += 1
       map[t.category].items.push(t)
     })
     return Object.entries(map).map(([n,v]) => ({ name: n, ...v })).sort((a,b) => b.total - a.total)
-  }, [monthTxs])
+  }, [monthTxs, monthEndRate])
 
   const totalTry = monthTxs.reduce((s,t) => s + t.amount, 0)
-  const monthEnd = new Date(year, month + 1, 0).toISOString().slice(0, 10)
-  const monthEndRate = getRateAt(monthEnd)
-  const totalChf = totalTry / monthEndRate
+  const totalChf = monthTxs.reduce((s,t) => s + chfOf(t), 0)
 
   // Durum
   const currentReport = useMemo(() => {
@@ -182,7 +188,7 @@ export default function LogicReport({ data }) {
                 <div style={{ fontSize: 13, fontWeight: 500 }}>{c.name}</div>
                 <div className="mono" style={{ textAlign: 'right', fontSize: 12, color: 'var(--ink-muted)' }}>{c.count}</div>
                 <div className="mono" style={{ textAlign: 'right', fontSize: 13, color: 'var(--red)' }}>{fmtTL(c.total)}</div>
-                <div className="mono" style={{ textAlign: 'right', fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>{fmtCHF(c.total / monthEndRate)}</div>
+                <div className="mono" style={{ textAlign: 'right', fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>{fmtCHF(c.totalChf)}</div>
               </div>
             ))}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 1fr 1fr', gap: 12, padding: '14px 0 4px', borderTop: '2px solid var(--accent)', alignItems: 'center' }}>

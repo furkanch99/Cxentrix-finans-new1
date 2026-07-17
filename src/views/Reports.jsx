@@ -60,6 +60,9 @@ export default function Reports({ data }) {
         } catch { return FALLBACK_RATE }
       }
       const toChf = (amount, date) => amount / rateFor(date)
+      // Fatih maasi + French primi sabit CHF olarak tutulur (nativeChfAmount).
+      // Digerleri icin TL/o gunku kur cevrilir.
+      const chfOf = (t) => t.nativeChfAmount != null ? t.nativeChfAmount : toChf(t.amount, t.date)
 
       // Tum yil islemlerini aya gore grupla (Fatih cari haric)
       const monthsDetailed = Array.from({ length: 12 }, (_, m) => {
@@ -70,7 +73,7 @@ export default function Reports({ data }) {
           txs.forEach(t => {
             if (!map[t.category]) map[t.category] = { total: 0, totalChf: 0, txs: [] }
             map[t.category].total    += t.amount
-            map[t.category].totalChf += toChf(t.amount, t.date)
+            map[t.category].totalChf += chfOf(t)
             map[t.category].txs.push(t)
           })
           return Object.entries(map)
@@ -81,8 +84,8 @@ export default function Reports({ data }) {
         const expCats = groupByCat(monthTxs.filter(t => t.type === 'expense'))
         const totalInc    = monthTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
         const totalExp    = monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-        const totalIncChf = monthTxs.filter(t => t.type === 'income').reduce((s, t) => s + toChf(t.amount, t.date), 0)
-        const totalExpChf = monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + toChf(t.amount, t.date), 0)
+        const totalIncChf = monthTxs.filter(t => t.type === 'income').reduce((s, t) => s + chfOf(t), 0)
+        const totalExpChf = monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + chfOf(t), 0)
         const monthEnd = new Date(year, m + 1, 0).toISOString().slice(0, 10)
         return {
           month: m, incCats, expCats,
