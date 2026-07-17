@@ -7,12 +7,30 @@ import { FALLBACK_RATE } from './utils'
 
 // === TRANSACTIONS ===
 export async function fetchTransactions() {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .order('date', { ascending: false })
-  if (error) throw error
-  return (data || []).map(t => ({
+  // Fatih maasi ve French Team Primi CHF cinsinden SABIT tutulur — sabit tutarlar
+  // fatih_monthly_salaries.amount_chf / french_team_commissions.total_chf kolonlarindadir.
+  // Kur dalgalanmasi bu tutarlari degistirmemeli; bu yuzden ilgili transaction'a
+  // nativeChfAmount ekleyip UI'in TL/kur formulunu bypass etmesini sagliyoruz.
+  const [txsRes, salsRes, commsRes] = await Promise.all([
+    supabase.from('transactions').select('*').order('date', { ascending: false }),
+    supabase.from('fatih_monthly_salaries').select('transaction_id, amount_chf'),
+    supabase.from('french_team_commissions').select('transaction_id, total_chf'),
+  ])
+  if (txsRes.error) throw txsRes.error
+
+  const nativeChf = new Map()
+  ;(salsRes.data || []).forEach(s => {
+    if (s.transaction_id != null && s.amount_chf != null) {
+      nativeChf.set(s.transaction_id, parseFloat(s.amount_chf))
+    }
+  })
+  ;(commsRes.data || []).forEach(c => {
+    if (c.transaction_id != null && c.total_chf != null) {
+      nativeChf.set(c.transaction_id, parseFloat(c.total_chf))
+    }
+  })
+
+  return (txsRes.data || []).map(t => ({
     id: t.id,
     type: t.type,
     date: t.date,
@@ -25,6 +43,9 @@ export async function fetchTransactions() {
     installmentNo: t.installment_no || null,
     installmentTotal: t.installment_total || null,
     checked: !!t.checked,
+    // Sabit CHF cinsinden anlasilmis kalem ise (Fatih maasi, French primi) DB'deki
+    // orijinal CHF tutari. Diger islemler icin null — TL/kur cevrimi yapilir.
+    nativeChfAmount: nativeChf.get(t.id) ?? null,
   }))
 }
 

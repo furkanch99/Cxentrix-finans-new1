@@ -35,12 +35,18 @@ export default function LogicView({ data }) {
       const totalTry = monthTxs.reduce((s, t) => s + t.amount, 0)
       const monthEnd = new Date(year, m + 1, 0).toISOString().slice(0, 10)
       const rate = getRateAt(monthEnd) || FALLBACK_RATE
-      const totalChf = totalTry / rate
+
+      // Sabit CHF tutarli kalemler (Fatih maasi, French primi) icin DB'deki
+      // orijinal CHF'i kullan; digerleri icin TL/kur cevir. Boylece Fatih maasi
+      // 4000 CHF olarak sabit gozukur, kur dalgalanmasindan etkilenmez.
+      const chfOf = (t) => t.nativeChfAmount != null ? t.nativeChfAmount : (t.amount / rate)
+      const totalChf = monthTxs.reduce((s, t) => s + chfOf(t), 0)
 
       const byCategory = {}
       monthTxs.forEach(t => {
-        if (!byCategory[t.category]) byCategory[t.category] = { total: 0, txs: [] }
+        if (!byCategory[t.category]) byCategory[t.category] = { total: 0, totalChf: 0, txs: [] }
         byCategory[t.category].total += t.amount
+        byCategory[t.category].totalChf += chfOf(t)
         byCategory[t.category].txs.push(t)
       })
 
@@ -48,7 +54,7 @@ export default function LogicView({ data }) {
         month: m, totalTry, totalChf, rate,
         transactionCount: monthTxs.length, transactions: monthTxs,
         categories: Object.entries(byCategory).map(([n,v]) => ({
-          name: n, amount: v.total, amountChf: v.total / rate,
+          name: n, amount: v.total, amountChf: v.totalChf,
           txs: v.txs.sort((a,b) => a.date.localeCompare(b.date)),
         })).sort((a,b) => b.amount - a.amount)
       }
@@ -590,7 +596,7 @@ function YearlyView({ year, monthlySummary, yearTotalTry, yearTotalChf, activeMo
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
                                       <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--red)' }}>{fmtTL(tx.amount)}</div>
-                                      <div className="mono" style={{ fontSize: 10, color: 'var(--ink-muted)' }}>{fmtCHF(tx.amount / m.rate)}</div>
+                                      <div className="mono" style={{ fontSize: 10, color: 'var(--ink-muted)' }}>{fmtCHF(tx.nativeChfAmount != null ? tx.nativeChfAmount : tx.amount / m.rate)}</div>
                                     </div>
                                   </div>
                                 </div>
