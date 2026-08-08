@@ -7,28 +7,36 @@ import { FALLBACK_RATE } from './utils'
 
 // === TRANSACTIONS ===
 export async function fetchTransactions() {
+  // Ana transactions sorgusu — bu bloklarsa hicbir sey gozukmez.
+  const txsRes = await supabase.from('transactions').select('*').order('date', { ascending: false })
+  if (txsRes.error) throw txsRes.error
+
   // Fatih maasi ve French Team Primi CHF cinsinden SABIT tutulur — sabit tutarlar
   // fatih_monthly_salaries.amount_chf / french_team_commissions.total_chf kolonlarindadir.
   // Kur dalgalanmasi bu tutarlari degistirmemeli; bu yuzden ilgili transaction'a
   // nativeChfAmount ekleyip UI'in TL/kur formulunu bypass etmesini sagliyoruz.
-  const [txsRes, salsRes, commsRes] = await Promise.all([
-    supabase.from('transactions').select('*').order('date', { ascending: false }),
-    supabase.from('fatih_monthly_salaries').select('transaction_id, amount_chf'),
-    supabase.from('french_team_commissions').select('transaction_id, total_chf'),
-  ])
-  if (txsRes.error) throw txsRes.error
-
+  //
+  // Bu iki sorgudan biri patlarsa (izin, network, tablo yok) ana veri akisini
+  // durdurmasin — nativeChf bos kalir, kayitlar TL/kur cevrilir (eski davranis).
   const nativeChf = new Map()
-  ;(salsRes.data || []).forEach(s => {
-    if (s.transaction_id != null && s.amount_chf != null) {
-      nativeChf.set(s.transaction_id, parseFloat(s.amount_chf))
-    }
-  })
-  ;(commsRes.data || []).forEach(c => {
-    if (c.transaction_id != null && c.total_chf != null) {
-      nativeChf.set(c.transaction_id, parseFloat(c.total_chf))
-    }
-  })
+  try {
+    const [salsRes, commsRes] = await Promise.all([
+      supabase.from('fatih_monthly_salaries').select('transaction_id, amount_chf'),
+      supabase.from('french_team_commissions').select('transaction_id, total_chf'),
+    ])
+    ;(salsRes.data || []).forEach(s => {
+      if (s.transaction_id != null && s.amount_chf != null) {
+        nativeChf.set(s.transaction_id, parseFloat(s.amount_chf))
+      }
+    })
+    ;(commsRes.data || []).forEach(c => {
+      if (c.transaction_id != null && c.total_chf != null) {
+        nativeChf.set(c.transaction_id, parseFloat(c.total_chf))
+      }
+    })
+  } catch (err) {
+    console.warn('Native CHF eslesmesi yuklenemedi, TL/kur cevrimine dusuluyor:', err?.message || err)
+  }
 
   return (txsRes.data || []).map(t => ({
     id: t.id,
