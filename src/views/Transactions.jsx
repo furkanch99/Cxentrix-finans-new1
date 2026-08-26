@@ -467,8 +467,16 @@ export default function Transactions({ data, reload, patchTransaction }) {
                    title={tx.paymentType}>
                 {tx.paymentType || '—'}
               </div>
-              <div className="mono" style={{ fontSize: 14, fontWeight: 700, textAlign: 'right', color: stripe }}>
-                {isIncome ? '+' : '−'}{fmtTL(tx.amount)}
+              <div style={{ textAlign: 'right' }}>
+                <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: stripe }}>
+                  {isIncome ? '+' : '−'}{fmtTL(tx.amount)}
+                </div>
+                {tx.originalCurrency && tx.originalCurrency !== 'TRY' && tx.originalAmount != null && (
+                  <div className="mono" style={{ fontSize: 10, color: 'var(--ink-muted)', marginTop: 2 }}>
+                    {Number(tx.originalAmount).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} {tx.originalCurrency}
+                    {tx.originalRate ? ` × ${Number(tx.originalRate).toLocaleString('tr-TR', { maximumFractionDigits: 4 })}` : ''}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                 <button onClick={() => setEditTx(tx)} title="Düzenle" className="tx-edit-btn"
