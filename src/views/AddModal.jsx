@@ -14,6 +14,23 @@ export default function AddModal({ data, reload, onClose }) {
   const [installmentCount, setInstallmentCount] = useState(3)
   const [saving, setSaving] = useState(false)
 
+  // Gelirler icin doviz destegi: TRY = TL girisi (default),
+  // CHF/EUR/USD secilirse orijinal tutar + kur girilir → TL otomatik hesaplanir.
+  const [currency, setCurrency] = useState('TRY')
+  const [origAmount, setOrigAmount] = useState('')
+  const [origRate,   setOrigRate]   = useState('')
+  const computedTl = (currency !== 'TRY' && parseFloat(origAmount) && parseFloat(origRate))
+    ? parseFloat(origAmount) * parseFloat(origRate)
+    : null
+
+  // Type/currency degisince ilgili alanlari sifirla
+  useEffect(() => {
+    if (form.type === 'expense') { setCurrency('TRY'); setOrigAmount(''); setOrigRate('') }
+  }, [form.type])
+  useEffect(() => {
+    if (currency === 'TRY') { setOrigAmount(''); setOrigRate('') }
+  }, [currency])
+
   const avail = data.categories.filter(c => c.type === form.type)
   useEffect(() => {
     if (avail.length > 0 && !avail.find(c => c.name === form.category)) {
@@ -27,24 +44,43 @@ export default function AddModal({ data, reload, onClose }) {
   }, [form.type])
 
   const submit = async () => {
-    if (!form.amount || !form.category) {
-      toast.error('Tutar ve kategori zorunlu.')
-      return
+    // Doviz seciliyse orijinal tutar + kur zorunlu, TL otomatik hesaplanir
+    const useForex = form.type === 'income' && currency !== 'TRY'
+    if (useForex) {
+      if (!origAmount || !origRate || !form.category) {
+        toast.error(`${currency} tutari, kur ve kategori zorunlu.`)
+        return
+      }
+    } else {
+      if (!form.amount || !form.category) {
+        toast.error('Tutar ve kategori zorunlu.')
+        return
+      }
     }
     setSaving(true)
     try {
+      const finalAmount = useForex ? computedTl : parseFloat(form.amount)
+      const forexPayload = useForex ? {
+        originalAmount:   parseFloat(origAmount),
+        originalCurrency: currency,
+        originalRate:     parseFloat(origRate),
+      } : {}
+
       if (isInstallment && installmentCount >= 2) {
         await addInstallmentTransaction({
           ...form,
-          amount: parseFloat(form.amount)
+          amount: finalAmount
         }, installmentCount)
         toast.success(`${installmentCount} taksitli işlem eklendi`)
       } else {
         await addTransaction({
           ...form,
-          amount: parseFloat(form.amount)
+          amount: finalAmount,
+          ...forexPayload,
         })
-        toast.success('İşlem eklendi')
+        toast.success(useForex
+          ? `Gelir eklendi (${origAmount} ${currency} × ${origRate} = ${finalAmount.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} TL)`
+          : 'İşlem eklendi')
       }
       await reload()
       onClose()
@@ -95,9 +131,47 @@ export default function AddModal({ data, reload, onClose }) {
           <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} style={inputStyle} />
         </Field>
 
-        <Field label={isInstallment ? "Toplam Tutar (₺)" : "Tutar (₺)"}>
-          <input type="number" step="0.01" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} placeholder="0.00" style={inputStyle} />
-        </Field>
+        {/* Gelir icin para birimi secimi */}
+        {form.type === 'income' && (
+          <Field label="Para Birimi">
+            <div style={{ display: 'flex', gap: 4, background: 'var(--bg-input)', padding: 3, borderRadius: 7 }}>
+              {['TRY','CHF','EUR','USD'].map(cur => (
+                <button key={cur} type="button" onClick={() => setCurrency(cur)} style={{
+                  flex: 1, padding: '7px 4px', borderRadius: 5, fontSize: 12, fontWeight: 600,
+                  background: currency === cur ? 'var(--accent)' : 'transparent',
+                  color: currency === cur ? 'white' : 'var(--ink-soft)',
+                  border: 'none', cursor: 'pointer'
+                }}>{cur}</button>
+              ))}
+            </div>
+          </Field>
+        )}
+
+        {/* Doviz secilirse orijinal tutar + kur; TL otomatik */}
+        {form.type === 'income' && currency !== 'TRY' ? (
+          <>
+            <Field label={`Tutar (${currency})`}>
+              <input type="number" step="0.01" value={origAmount} onChange={e => setOrigAmount(e.target.value)} placeholder="0.00" style={inputStyle} />
+            </Field>
+            <Field label={`Kur (1 ${currency} = ? ₺)`}>
+              <input type="number" step="0.0001" value={origRate} onChange={e => setOrigRate(e.target.value)} placeholder="Örn: 58.70" style={inputStyle} />
+            </Field>
+            <div style={{
+              background: 'var(--accent-soft)', border: '1px solid var(--accent)',
+              borderRadius: 8, padding: '10px 14px', marginBottom: 14,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <span style={{ fontSize: 11, color: 'var(--ink-muted)', fontWeight: 600, letterSpacing: '.05em' }}>TL KARSILIGI</span>
+              <span className="mono" style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)' }}>
+                {computedTl != null ? computedTl.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) + ' ₺' : '—'}
+              </span>
+            </div>
+          </>
+        ) : (
+          <Field label={isInstallment ? "Toplam Tutar (₺)" : "Tutar (₺)"}>
+            <input type="number" step="0.01" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} placeholder="0.00" style={inputStyle} />
+          </Field>
+        )}
 
         <Field label="Kategori">
           <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} style={inputStyle}>

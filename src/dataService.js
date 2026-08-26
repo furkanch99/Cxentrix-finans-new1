@@ -54,6 +54,11 @@ export async function fetchTransactions() {
     // Sabit CHF cinsinden anlasilmis kalem ise (Fatih maasi, French primi) DB'deki
     // orijinal CHF tutari. Diger islemler icin null — TL/kur cevrimi yapilir.
     nativeChfAmount: nativeChf.get(t.id) ?? null,
+    // Orijinal para birimi (CHF/EUR/USD vs.) girildiyse — gelirler icin.
+    // Amount her zaman TL'dedir; bu alanlar sadece bilgi/gosterim amaclidir.
+    originalAmount:   t.original_amount != null ? parseFloat(t.original_amount) : null,
+    originalCurrency: t.original_currency || null,
+    originalRate:     t.original_rate != null ? parseFloat(t.original_rate) : null,
   }))
 }
 
@@ -75,6 +80,10 @@ export async function addTransaction(tx) {
       type: tx.type, date: tx.date, amount: tx.amount, category: tx.category,
       customer: tx.customer || null, payment_type: tx.paymentType || null,
       description: tx.description || null, created_by: user?.id,
+      // Orijinal para birimi (CHF/EUR/USD) — sadece verilirse yaz
+      original_amount:   tx.originalAmount   != null ? tx.originalAmount   : null,
+      original_currency: tx.originalCurrency || null,
+      original_rate:     tx.originalRate     != null ? tx.originalRate     : null,
     })
     .select().single()
   if (error) throw error
