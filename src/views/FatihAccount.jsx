@@ -643,29 +643,44 @@ function GroupedDetailPanel({ fatihData, salaries, tugbaSalaries, handleDeleteSa
 function TxTable({ txs, color }) {
   const { getRateAt } = useCurrency()
   const sorted = [...txs].sort((a, b) => (a.date < b.date ? 1 : -1))
-  // Sabit CHF (Fatih maasi, French primi) varsa onu kullan, yoksa o gunku kur ile cevir.
-  // Hicbir rate yoksa FALLBACK_RATE'e dus.
-  const chfOf = (t) => {
-    if (t.nativeChfAmount != null) return t.nativeChfAmount
+  // Her satir icin aktif kur + CHF belirle:
+  //   - nativeChfAmount varsa (Fatih maasi, French primi) → sabit CHF, etkin kur = amount/chf
+  //   - Yoksa → o gunku exchange_rates kuru (yoksa FALLBACK_RATE)
+  const rowOf = (t) => {
+    const amount = safeNumber(t.amount)
+    if (t.nativeChfAmount != null) {
+      const effective = t.nativeChfAmount > 0 ? amount / t.nativeChfAmount : 0
+      return { chf: t.nativeChfAmount, rate: effective, isFixed: true }
+    }
     let r = 0
     try { r = getRateAt(t.date) } catch {}
-    if (!r || r <= 0) r = FALLBACK_RATE
-    return safeNumber(t.amount) / r
+    const isFallback = !r || r <= 0
+    if (isFallback) r = FALLBACK_RATE
+    return { chf: amount / r, rate: r, isFixed: false, isFallback }
   }
   return (
     <SimpleTable
-      cols={['100px', '1fr', '160px', '120px', '110px']}
-      headers={['Tarih', 'Açıklama', 'Kategori', 'CHF', 'TL']}
-      rows={sorted.map(t => ({
-        key: t.id,
-        cells: [
-          <span style={{ color: 'var(--ink-muted)' }}>{new Date(t.date).toLocaleDateString('tr-TR')}</span>,
-          <span title={t.description} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{t.description || '—'}</span>,
-          <span style={{ color: 'var(--ink-muted)', fontSize: 11 }}>{t.category}</span>,
-          <span className="mono" style={{ textAlign: 'right', fontWeight: 600, color }}>{fmtCHF(chfOf(t))}</span>,
-          <span className="mono" style={{ textAlign: 'right', color: 'var(--ink-soft)' }}>{fmtTL(safeNumber(t.amount))}</span>,
-        ],
-      }))}
+      cols={['95px', '1fr', '140px', '90px', '110px', '110px']}
+      headers={['Tarih', 'Açıklama', 'Kategori', 'Kur', 'CHF', 'TL']}
+      rows={sorted.map(t => {
+        const { chf, rate, isFixed, isFallback } = rowOf(t)
+        return {
+          key: t.id,
+          cells: [
+            <span style={{ color: 'var(--ink-muted)' }}>{new Date(t.date).toLocaleDateString('tr-TR')}</span>,
+            <span title={t.description} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{t.description || '—'}</span>,
+            <span style={{ color: 'var(--ink-muted)', fontSize: 11 }}>{t.category}</span>,
+            <span className="mono" style={{
+              textAlign: 'right', fontSize: 11,
+              color: isFixed ? 'var(--ink-muted)' : (isFallback ? 'var(--amber)' : 'var(--ink-soft)')
+            }} title={isFixed ? 'Sabit CHF — kurdan bagimsiz, etkin kur hesaplanmistir' : (isFallback ? 'O gun icin kayitli kur yok — FALLBACK' : 'O gunku kayitli kur')}>
+              {rate > 0 ? rate.toFixed(2) : '—'}{isFixed ? ' *' : ''}
+            </span>,
+            <span className="mono" style={{ textAlign: 'right', fontWeight: 600, color }}>{fmtCHF(chf)}</span>,
+            <span className="mono" style={{ textAlign: 'right', color: 'var(--ink-soft)' }}>{fmtTL(safeNumber(t.amount))}</span>,
+          ],
+        }
+      })}
     />
   )
 }
