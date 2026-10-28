@@ -641,7 +641,17 @@ function GroupedDetailPanel({ fatihData, salaries, tugbaSalaries, handleDeleteSa
 }
 
 function TxTable({ txs, color }) {
+  const { getRateAt } = useCurrency()
   const sorted = [...txs].sort((a, b) => (a.date < b.date ? 1 : -1))
+  // Sabit CHF (Fatih maasi, French primi) varsa onu kullan, yoksa o gunku kur ile cevir.
+  // Hicbir rate yoksa FALLBACK_RATE'e dus.
+  const chfOf = (t) => {
+    if (t.nativeChfAmount != null) return t.nativeChfAmount
+    let r = 0
+    try { r = getRateAt(t.date) } catch {}
+    if (!r || r <= 0) r = FALLBACK_RATE
+    return safeNumber(t.amount) / r
+  }
   return (
     <SimpleTable
       cols={['100px', '1fr', '160px', '120px', '110px']}
@@ -652,7 +662,7 @@ function TxTable({ txs, color }) {
           <span style={{ color: 'var(--ink-muted)' }}>{new Date(t.date).toLocaleDateString('tr-TR')}</span>,
           <span title={t.description} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{t.description || '—'}</span>,
           <span style={{ color: 'var(--ink-muted)', fontSize: 11 }}>{t.category}</span>,
-          <span className="mono" style={{ textAlign: 'right', fontWeight: 600, color }}>{fmtCHF(safeNumber(t.amount) / 54)}</span>,
+          <span className="mono" style={{ textAlign: 'right', fontWeight: 600, color }}>{fmtCHF(chfOf(t))}</span>,
           <span className="mono" style={{ textAlign: 'right', color: 'var(--ink-soft)' }}>{fmtTL(safeNumber(t.amount))}</span>,
         ],
       }))}
